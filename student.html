@@ -35,6 +35,18 @@
       <button id="start-quiz" class="quiz-start">Iniciar bloco de questões</button>
       <div id="quiz" class="quiz-area"></div>
     </section>
+    <section class="card content-card">
+      <h2>Simulado geral — 1ª fase</h2>
+      <p class="muted">Treine em uma prova geral de até 80 questões autorais, com correção e geração automática de revisões.</p>
+      <button id="start-mock" class="quiz-start">Iniciar simulado de 80 questões</button>
+      <div id="mock-exam" class="quiz-area"></div>
+    </section>
+    <section class="card content-card">
+      <h2>Trilha inicial da 2ª fase</h2>
+      <p class="muted">Escolha uma área para consultar peças práticas, fundamentos, questões discursivas e gestão da prova de cinco horas.</p>
+      <div id="phase2-subjects" class="plans"></div>
+      <div id="phase2-lessons" class="empty muted">Selecione uma área da 2ª fase.</div>
+    </section>
     <section class="dashboard-grid content-card">
       <div class="card"><h2>Calendário</h2><p class="muted">Revisões e marcos do seu plano.</p><div id="calendar" class="empty muted">Carregando calendário…</div></div>
       <div class="card"><h2>Revisões pendentes</h2><p class="muted">Erros do simulado ficam guardados aqui.</p><div id="reviews" class="empty muted">Nenhuma revisão pendente.</div></div>
@@ -96,6 +108,25 @@
     }
     document.querySelector('#start-quiz').addEventListener('click', startQuiz);
 
+    async function startMockExam(){
+      const response=await fetch('/api/simulado'); if(!response.ok) return;
+      const data=await response.json(); const container=document.querySelector('#mock-exam'); container.innerHTML=`<p class="muted">${data.total} questões carregadas. Reserve tempo e responda sem consultar o material.</p>`;
+      data.questions.forEach((question,index)=>{
+        const block=document.createElement('article'); block.className='quiz-question';
+        const options=question.options.map((option,optionIndex)=>`<label class="quiz-option"><input type="radio" name="mock-${question.id}" value="${optionIndex}"> ${String.fromCharCode(65+optionIndex)}) ${option}</label>`).join('');
+        block.innerHTML=`<p>${index+1}. <span class="muted">${question.subject_name}</span> — ${question.prompt}</p>${options}`; container.appendChild(block);
+      });
+      const submit=document.createElement('button'); submit.className='quiz-submit'; submit.textContent='Corrigir simulado'; submit.addEventListener('click',async()=>{
+        const answers={}; data.questions.forEach(question=>{const selected=document.querySelector(`input[name="mock-${question.id}"]:checked`);if(selected) answers[question.id]=Number(selected.value);});
+        submit.disabled=true; const result=await fetch('/api/simulado/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_ids:data.questions.map(question=>question.id),answers})});
+        if(!result.ok){submit.disabled=false;return;} const correction=await result.json();
+        const output=document.createElement('div'); output.className='quiz-result'; output.innerHTML=`<strong>Resultado: ${correction.score}/${correction.total}</strong><p class="muted">As respostas incorretas foram encaminhadas para suas revisões.</p>`;
+        correction.corrections.forEach((item,index)=>{const article=document.createElement('article');article.innerHTML=`<strong>${index+1}. ${item.correct?'✓ Acerto':'✗ Revise este tema'} · ${item.subject_name}</strong><small>${item.explanation}</small>`;output.appendChild(article);}); container.appendChild(output); submit.remove();
+      });
+      container.appendChild(submit);
+    }
+    document.querySelector('#start-mock').addEventListener('click', startMockExam);
+
     async function loadCalendar(){
       const response=await fetch('/api/calendar'); if(!response.ok) return;
       const data=await response.json(); const container=document.querySelector('#calendar'); container.innerHTML='';
@@ -114,18 +145,23 @@
       const data = await response.json();
       document.querySelector('#quiz-subject').innerHTML=data.subjects.filter(subject=>subject.questions>0).map(subject=>`<option value="${subject.id}">${subject.name} · ${subject.questions} questões</option>`).join('');
       const container = document.querySelector('#subjects'); container.innerHTML='';
-      data.subjects.forEach(subject => {
+      data.subjects.filter(subject=>subject.phase==='1ª fase').forEach(subject => {
         const button=document.createElement('button');
         button.textContent=`${subject.name} · ${subject.question_weight}`;
-        button.addEventListener('click',()=>loadLessons(subject.id, button));
+        button.addEventListener('click',()=>loadLessons(subject.id, button, '#lessons'));
         container.appendChild(button);
       });
+      const phase2=document.querySelector('#phase2-subjects'); phase2.innerHTML='';
+      data.subjects.filter(subject=>subject.phase==='2ª fase').forEach(subject => {
+        const button=document.createElement('button'); button.textContent=subject.name;
+        button.addEventListener('click',()=>loadLessons(subject.id, button, '#phase2-lessons')); phase2.appendChild(button);
+      });
     }
-    async function loadLessons(subjectId, button){
+    async function loadLessons(subjectId, button, target='#lessons'){
       const response = await fetch(`/api/lessons?subject=${subjectId}`);
       if(!response.ok) return;
-      document.querySelectorAll('#subjects button').forEach(item=>item.classList.remove('active')); button.classList.add('active');
-      const data = await response.json(); const container=document.querySelector('#lessons'); container.innerHTML='';
+      document.querySelectorAll(`${target === '#lessons' ? '#subjects' : '#phase2-subjects'} button`).forEach(item=>item.classList.remove('active')); button.classList.add('active');
+      const data = await response.json(); const container=document.querySelector(target); container.innerHTML='';
       data.lessons.forEach(lesson=>{const item=document.createElement('article');item.className='lesson';item.innerHTML=`<strong>${lesson.title}</strong><span>${lesson.summary}</span><small class="muted">${lesson.source_note}</small>`;container.appendChild(item);});
     }
     document.querySelectorAll('.plans button').forEach(button => button.addEventListener('click', async () => {

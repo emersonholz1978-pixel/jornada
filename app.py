@@ -180,6 +180,13 @@ def ensure_schema():
             ("Direito Eleitoral", "1ª fase", 2, 18),
             ("Direito Financeiro", "1ª fase", 2, 19),
             ("Direito Previdenciário", "1ª fase", 2, 20),
+            ("2ª fase — Direito Administrativo", "2ª fase", 0, 101),
+            ("2ª fase — Direito Civil", "2ª fase", 0, 102),
+            ("2ª fase — Direito Constitucional", "2ª fase", 0, 103),
+            ("2ª fase — Direito do Trabalho", "2ª fase", 0, 104),
+            ("2ª fase — Direito Empresarial", "2ª fase", 0, 105),
+            ("2ª fase — Direito Penal", "2ª fase", 0, 106),
+            ("2ª fase — Direito Tributário", "2ª fase", 0, 107),
         ]
         if is_postgres():
             with conn.cursor() as cur:
@@ -216,6 +223,13 @@ def ensure_schema():
         electoral = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Direito Eleitoral",))[0]
         financial = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Direito Financeiro",))[0]
         social_security = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Direito Previdenciário",))[0]
+        phase2_admin = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("2ª fase — Direito Administrativo",))[0]
+        phase2_civil = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("2ª fase — Direito Civil",))[0]
+        phase2_constitutional = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("2ª fase — Direito Constitucional",))[0]
+        phase2_labour = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("2ª fase — Direito do Trabalho",))[0]
+        phase2_business = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("2ª fase — Direito Empresarial",))[0]
+        phase2_penal = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("2ª fase — Direito Penal",))[0]
+        phase2_tax = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("2ª fase — Direito Tributário",))[0]
         lesson_rows += [
             (civil, "Pessoas e personalidade", "Revise capacidade, direitos da personalidade e proteção jurídica da pessoa.", "Material autoral OAB FÁCIL; confira o Código Civil vigente.", 1),
             (civil, "Obrigações e responsabilidade civil", "Organize obrigação, dano, nexo causal e as hipóteses gerais de responsabilização.", "Material autoral OAB FÁCIL; confira o Código Civil vigente.", 2),
@@ -293,6 +307,27 @@ def ensure_schema():
             (social_security, "Benefícios previdenciários", "Organize noções gerais de benefícios e requisitos legais.", "Material autoral OAB FÁCIL; confira a legislação vigente.", 2),
             (social_security, "Custeio e filiação", "Estude filiação, contribuições e custeio do sistema previdenciário.", "Material autoral OAB FÁCIL; confira a legislação vigente.", 3),
             (social_security, "Revisão previdenciária", "Resolva questões e confira a legislação previdenciária atualizada.", "Material autoral OAB FÁCIL; confira a fonte oficial vigente.", 4),
+            (phase2_admin, "Escolha da área e estrutura da peça", "Defina a estratégia da prova prático-profissional e organize a estrutura da peça administrativa.", "Material autoral OAB FÁCIL; confira o edital e os padrões oficiais vigentes.", 1),
+            (phase2_admin, "Fundamentação e pedidos", "Treine fatos, fundamentos jurídicos, tutela, pedidos e fechamento da peça.", "Material autoral OAB FÁCIL; confira a legislação vigente.", 2),
+            (phase2_admin, "Questão discursiva e revisão", "Pratique respostas fundamentadas, gestão de tempo e revisão final da prova.", "Material autoral OAB FÁCIL; confira o edital vigente.", 3),
+            (phase2_civil, "Peças cíveis principais", "Organize identificação e estrutura das peças mais recorrentes da área cível.", "Material autoral OAB FÁCIL; confira o edital e a legislação vigente.", 1),
+            (phase2_civil, "Fundamentação no caso concreto", "Treine qualificação jurídica dos fatos, preliminares, mérito e pedidos.", "Material autoral OAB FÁCIL; confira o CPC e a legislação vigente.", 2),
+            (phase2_civil, "Questões discursivas cíveis", "Pratique respostas objetivas com indicação de dispositivo e conclusão.", "Material autoral OAB FÁCIL; confira o edital vigente.", 3),
+            (phase2_constitutional, "Peças constitucionais", "Revise a identificação de remédios e ações constitucionais conforme o caso.", "Material autoral OAB FÁCIL; confira o edital e a Constituição vigentes.", 1),
+            (phase2_constitutional, "Tese constitucional", "Estruture fundamentos, legitimidade, cabimento e pedidos constitucionais.", "Material autoral OAB FÁCIL; confira a Constituição vigente.", 2),
+            (phase2_constitutional, "Discursivas e controle de constitucionalidade", "Treine respostas fundamentadas e revisão de controle constitucional.", "Material autoral OAB FÁCIL; confira a legislação vigente.", 3),
+            (phase2_labour, "Peças trabalhistas", "Estude estrutura de reclamação, defesa e outras peças conforme o enunciado.", "Material autoral OAB FÁCIL; confira o edital e a CLT vigentes.", 1),
+            (phase2_labour, "Cálculos e pedidos trabalhistas", "Organize verbas, fundamentos, pedidos e valores com atenção ao caso.", "Material autoral OAB FÁCIL; confira a CLT vigente.", 2),
+            (phase2_labour, "Discursivas e gestão de tempo", "Pratique respostas diretas, fundamentação e revisão em cinco horas.", "Material autoral OAB FÁCIL; confira o edital vigente.", 3),
+            (phase2_business, "Peças empresariais", "Identifique a medida adequada e estruture a peça conforme o problema empresarial.", "Material autoral OAB FÁCIL; confira o edital e a legislação vigente.", 1),
+            (phase2_business, "Sociedades e crise empresarial", "Aplique conceitos societários e de recuperação ao caso concreto.", "Material autoral OAB FÁCIL; confira a legislação vigente.", 2),
+            (phase2_business, "Discursivas empresariais", "Treine respostas com fundamento legal, conclusão e atenção aos requisitos.", "Material autoral OAB FÁCIL; confira o edital vigente.", 3),
+            (phase2_penal, "Peças penais", "Revise identificação, endereçamento, fundamentos e pedidos nas peças penais.", "Material autoral OAB FÁCIL; confira o edital e o CPP vigentes.", 1),
+            (phase2_penal, "Teses defensivas", "Organize teses preliminares, mérito, nulidades e pedidos defensivos.", "Material autoral OAB FÁCIL; confira a legislação vigente.", 2),
+            (phase2_penal, "Discursivas penais", "Pratique respostas fundamentadas e controle do tempo de prova.", "Material autoral OAB FÁCIL; confira o edital vigente.", 3),
+            (phase2_tax, "Peças tributárias", "Identifique a medida adequada e organize fundamentos e pedidos tributários.", "Material autoral OAB FÁCIL; confira o edital, a Constituição e o CTN vigentes.", 1),
+            (phase2_tax, "Tese e prova no caso tributário", "Treine lançamento, crédito, limitações e argumentos aplicáveis ao caso.", "Material autoral OAB FÁCIL; confira a legislação vigente.", 2),
+            (phase2_tax, "Discursivas tributárias", "Pratique respostas objetivas com dispositivo legal e conclusão.", "Material autoral OAB FÁCIL; confira o edital vigente.", 3),
         ]
         if is_postgres():
             with conn.cursor() as cur:
@@ -623,10 +658,10 @@ def subjects():
         return jsonify({"message": "Faça login para continuar."}), 401
     conn = connection()
     try:
-        rows = fetch_all(conn, "SELECT id, name, phase, question_weight FROM subjects ORDER BY sort_order")
+        rows = fetch_all(conn, "SELECT s.id, s.name, s.phase, s.question_weight, COUNT(q.id) FROM subjects s LEFT JOIN questions q ON q.subject_id = s.id GROUP BY s.id, s.name, s.phase, s.question_weight, s.sort_order ORDER BY s.sort_order")
     finally:
         conn.close()
-    return jsonify({"ok": True, "subjects": [{"id": r[0], "name": r[1], "phase": r[2], "question_weight": r[3]} for r in rows]})
+    return jsonify({"ok": True, "subjects": [{"id": r[0], "name": r[1], "phase": r[2], "question_weight": r[3], "questions": r[4]} for r in rows]})
 
 
 @app.get("/api/lessons")
@@ -711,6 +746,65 @@ def complete_review(review_id):
     finally:
         conn.close()
     return jsonify({"ok": True})
+
+
+@app.get("/api/simulado")
+def general_mock_exam():
+    if not logged_user_id():
+        return jsonify({"message": "Faça login para continuar."}), 401
+    conn = connection()
+    try:
+        rows = fetch_all(conn, """SELECT q.id, q.prompt, q.options_json, q.subject_id, s.name
+            FROM questions q JOIN subjects s ON s.id = q.subject_id
+            WHERE s.phase = %s ORDER BY s.sort_order, q.id LIMIT 80""", ("1ª fase",))
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "total": len(rows), "questions": [{"id": r[0], "prompt": r[1], "options": json.loads(r[2]), "subject_id": r[3], "subject_name": r[4]} for r in rows]})
+
+
+@app.post("/api/simulado/submit")
+def submit_general_mock_exam():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    payload = request.get_json(silent=True) or {}
+    raw_answers = payload.get("answers", {})
+    question_ids = payload.get("question_ids", [])
+    if not isinstance(raw_answers, dict) or not isinstance(question_ids, list) or not question_ids:
+        return jsonify({"message": "Envie as respostas do simulado."}), 400
+    try:
+        ids = [int(item) for item in question_ids]
+    except (TypeError, ValueError):
+        return jsonify({"message": "Questões inválidas."}), 400
+    placeholders = ",".join(["%s"] * len(ids))
+    conn = connection()
+    try:
+        rows = fetch_all(conn, f"SELECT q.id, q.prompt, q.answer_index, q.explanation, q.subject_id, s.name FROM questions q JOIN subjects s ON s.id = q.subject_id WHERE q.id IN ({placeholders}) AND s.phase = %s", tuple(ids) + ("1ª fase",))
+        by_id = {row[0]: row for row in rows}
+        corrections = []
+        score = 0
+        for question_id in ids:
+            row = by_id.get(question_id)
+            if not row:
+                continue
+            selected = raw_answers.get(str(question_id))
+            try:
+                selected_int = int(selected) if selected is not None else None
+            except (TypeError, ValueError):
+                selected_int = None
+            correct = selected_int == row[2]
+            if correct:
+                score += 1
+            corrections.append({"id": row[0], "prompt": row[1], "selected": selected_int, "correct_answer": row[2], "correct": correct, "explanation": row[3], "subject_name": row[5]})
+            if not correct:
+                if is_postgres():
+                    execute(conn, "INSERT INTO review_items (user_id, question_id, title, detail) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING", (user_id, row[0], f"Revisar questão de {row[5]}", row[3]))
+                else:
+                    execute(conn, "INSERT OR IGNORE INTO review_items (user_id, question_id, title, detail) VALUES (%s, %s, %s, %s)", (user_id, row[0], f"Revisar questão de {row[5]}", row[3]))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "score": score, "total": len(corrections), "corrections": corrections})
 
 
 @app.get("/api/quiz")
