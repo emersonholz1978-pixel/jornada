@@ -5,7 +5,7 @@ import os
 import re
 import sqlite3
 import secrets
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 
 from flask import Flask, jsonify, request, send_from_directory, Response, session
@@ -99,6 +99,16 @@ def ensure_schema():
                     subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
                     score INTEGER NOT NULL, total INTEGER NOT NULL, answers_json TEXT NOT NULL,
                     completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+                """CREATE TABLE IF NOT EXISTS calendar_events (
+                    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    title VARCHAR(180) NOT NULL, event_date DATE NOT NULL, category VARCHAR(40) NOT NULL,
+                    completed BOOLEAN NOT NULL DEFAULT FALSE)""",
+                """CREATE TABLE IF NOT EXISTS review_items (
+                    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    question_id BIGINT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+                    title VARCHAR(180) NOT NULL, detail TEXT NOT NULL,
+                    completed BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE(user_id, question_id))""",
             ]
         else:
             statements = [
@@ -136,6 +146,15 @@ def ensure_schema():
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
                     subject_id INTEGER NOT NULL, score INTEGER NOT NULL, total INTEGER NOT NULL,
                     answers_json TEXT NOT NULL, completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE IF NOT EXISTS calendar_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                    title TEXT NOT NULL, event_date TEXT NOT NULL, category TEXT NOT NULL,
+                    completed INTEGER NOT NULL DEFAULT 0)""",
+                """CREATE TABLE IF NOT EXISTS review_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                    question_id INTEGER NOT NULL, title TEXT NOT NULL, detail TEXT NOT NULL,
+                    completed INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, question_id))""",
             ]
         for statement in statements:
             execute(conn, statement)
@@ -413,6 +432,74 @@ def lessons():
     return jsonify({"ok": True, "lessons": [{"id": r[0], "title": r[1], "summary": r[2], "source_note": r[3]} for r in rows]})
 
 
+@app.get("/api/calendar")
+def calendar():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    user = user_row(user_id)
+    conn = connection()
+    try:
+        count = fetch_one(conn, "SELECT COUNT(*) FROM calendar_events WHERE user_id = %s", (user_id,))[0]
+        if count == 0:
+            plan_days = user[3] if user else 30
+            schedule = [(0, "Diagnóstico inicial", "estudo"), (2, "Revisão de Ética e Estatuto", "revisão"), (6, "Simulado semanal", "simulado"), (13, "Revisão dos erros", "revisão"), (20, "Bloco de questões", "questões"), (plan_days - 1, "Fechamento do ciclo", "revisão")]
+            events = [(user_id, title, date.today() + timedelta(days=min(offset, max(plan_days - 1, 0))), category) for offset, title, category in schedule]
+            if is_postgres():
+                with conn.cursor() as cur:
+                    cur.executemany("INSERT INTO calendar_events (user_id, title, event_date, category) VALUES (%s, %s, %s, %s)", events)
+            else:
+                conn.executemany("INSERT INTO calendar_events (user_id, title, event_date, category) VALUES (?, ?, ?, ?)", [(u, t, d.isoformat(), c) for u, t, d, c in events])
+            conn.commit()
+        rows = fetch_all(conn, "SELECT id, title, event_date, category, completed FROM calendar_events WHERE user_id = %s ORDER BY event_date, id")
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "events": [{"id": r[0], "title": r[1], "event_date": str(r[2]), "category": r[3], "completed": bool(r[4])} for r in rows]})
+
+
+@app.post("/api/calendar/<int:event_id>/complete")
+def complete_calendar_event(event_id):
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    completed = bool((request.get_json(silent=True) or {}).get("completed"))
+    conn = connection()
+    try:
+        execute(conn, "UPDATE calendar_events SET completed = %s WHERE id = %s AND user_id = %s", (completed, event_id, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/reviews")
+def reviews():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    conn = connection()
+    try:
+        rows = fetch_all(conn, "SELECT id, question_id, title, detail, completed FROM review_items WHERE user_id = %s ORDER BY completed, id DESC", (user_id,))
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "reviews": [{"id": r[0], "question_id": r[1], "title": r[2], "detail": r[3], "completed": bool(r[4])} for r in rows]})
+
+
+@app.post("/api/reviews/<int:review_id>/complete")
+def complete_review(review_id):
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    completed = bool((request.get_json(silent=True) or {}).get("completed"))
+    conn = connection()
+    try:
+        execute(conn, "UPDATE review_items SET completed = %s WHERE id = %s AND user_id = %s", (completed, review_id, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
+
+
 @app.get("/api/quiz")
 def quiz():
     if not logged_user_id():
@@ -459,6 +546,11 @@ def submit_quiz():
             if correct:
                 score += 1
             corrections.append({"id": row[0], "prompt": row[1], "selected": selected_int, "correct_answer": row[3], "correct": correct, "explanation": row[4]})
+            if not correct:
+                if is_postgres():
+                    execute(conn, "INSERT INTO review_items (user_id, question_id, title, detail) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING", (user_id, row[0], "Revisar questão de Ética", row[4]))
+                else:
+                    execute(conn, "INSERT OR IGNORE INTO review_items (user_id, question_id, title, detail) VALUES (%s, %s, %s, %s)", (user_id, row[0], "Revisar questão de Ética", row[4]))
         if is_postgres():
             with conn.cursor() as cur:
                 cur.execute("INSERT INTO quiz_attempts (user_id, subject_id, score, total, answers_json) VALUES (%s, %s, %s, %s, %s)", (user_id, subject_id, score, len(rows), json.dumps(raw_answers)))
