@@ -129,6 +129,11 @@ def ensure_schema():
                     piece_id BIGINT NOT NULL,
                     answers_json TEXT NOT NULL, score INTEGER NOT NULL, max_score INTEGER NOT NULL,
                     duration_seconds INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+                """CREATE TABLE IF NOT EXISTS phase2_review_items (
+                    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                    title VARCHAR(180) NOT NULL, detail TEXT NOT NULL,
+                    completed BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
                 """CREATE TABLE IF NOT EXISTS study_tasks (
                     id BIGSERIAL PRIMARY KEY, plan_days INTEGER NOT NULL,
                     day_number INTEGER NOT NULL, title VARCHAR(180) NOT NULL,
@@ -201,6 +206,10 @@ def ensure_schema():
                     subject_id INTEGER NOT NULL, piece_id INTEGER NOT NULL,
                     answers_json TEXT NOT NULL, score INTEGER NOT NULL, max_score INTEGER NOT NULL,
                     duration_seconds INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE IF NOT EXISTS phase2_review_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                    subject_id INTEGER NOT NULL, title TEXT NOT NULL, detail TEXT NOT NULL,
+                    completed INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
                 """CREATE TABLE IF NOT EXISTS study_tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, plan_days INTEGER NOT NULL,
                     day_number INTEGER NOT NULL, title TEXT NOT NULL,
@@ -974,15 +983,50 @@ def submit_phase2_mock():
     for item in normalized:
         item["score"] = min(10, sum(2 for key in ("cabimento", "fundamento", "aplicacao", "conclusao", "clareza") if item["criteria"].get(key)))
         score += item["score"]
+    piece_keys = ("cabimento", "fundamento", "estrutura", "pedidos", "clareza")
+    answer_keys = ("cabimento", "fundamento", "aplicacao", "conclusao", "clareza")
+    missing_piece = [key for key in piece_keys if not piece_criteria.get(key)]
     conn = connection()
     try:
         execute(conn, "INSERT INTO phase2_mock_attempts (user_id, subject_id, piece_id, answers_json, score, max_score, duration_seconds) VALUES (%s, %s, %s, %s, %s, %s, %s)", (user_id, subject_id, piece_id, json.dumps({"piece": piece, "answers": normalized}), score, 50, duration))
+        if missing_piece:
+            execute(conn, "INSERT INTO phase2_review_items (user_id, subject_id, title, detail) VALUES (%s, %s, %s, %s)", (user_id, subject_id, "Revisar critérios da peça", "Reforce: " + ", ".join(missing_piece) + "."))
+        for item in normalized:
+            missing = [key for key in answer_keys if not item["criteria"].get(key)]
+            if missing:
+                execute(conn, "INSERT INTO phase2_review_items (user_id, subject_id, title, detail) VALUES (%s, %s, %s, %s)", (user_id, subject_id, "Revisar questão discursiva", f"Questão {item['question_id']}: reforce " + ", ".join(missing) + "."))
         conn.commit()
     finally:
         conn.close()
-    piece_keys = ("cabimento", "fundamento", "estrutura", "pedidos", "clareza")
-    answer_keys = ("cabimento", "fundamento", "aplicacao", "conclusao", "clareza")
-    return jsonify({"ok": True, "score": score, "max_score": 50, "feedback": "Resultado orientador salvo. Revise a peça, compare os fundamentos e confira a legislação e o edital vigentes.", "review": {"piece_missing": [key for key in piece_keys if not piece_criteria.get(key)], "answers": [{"question_id": item["question_id"], "score": item["score"], "missing": [key for key in answer_keys if not item["criteria"].get(key)]} for item in normalized]}})
+    return jsonify({"ok": True, "score": score, "max_score": 50, "feedback": "Resultado orientador salvo. Revise a peça, compare os fundamentos e confira a legislação e o edital vigentes.", "review": {"piece_missing": missing_piece, "answers": [{"question_id": item["question_id"], "score": item["score"], "missing": [key for key in answer_keys if not item["criteria"].get(key)]} for item in normalized]}})
+
+
+@app.get("/api/phase2/reviews")
+def phase2_reviews():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    conn = connection()
+    try:
+        rows = fetch_all(conn, "SELECT r.id, r.title, r.detail, r.completed, s.name FROM phase2_review_items r JOIN subjects s ON s.id = r.subject_id WHERE r.user_id = %s ORDER BY r.completed, r.id DESC", (user_id,))
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "reviews": [{"id": r[0], "title": r[1], "detail": r[2], "completed": bool(r[3]), "subject": r[4]} for r in rows]})
+
+
+@app.post("/api/phase2/reviews/<int:review_id>/complete")
+def complete_phase2_review(review_id):
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    completed = bool((request.get_json(silent=True) or {}).get("completed"))
+    conn = connection()
+    try:
+        execute(conn, "UPDATE phase2_review_items SET completed = %s WHERE id = %s AND user_id = %s", (completed, review_id, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True})
 
 
 @app.get("/api/phase2/materials")

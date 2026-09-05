@@ -56,6 +56,11 @@
       <div id="performance" class="empty muted">Ainda não há tentativas registradas.</div>
     </section>
     <section class="card content-card">
+      <h2>Revisões da 2ª fase</h2>
+      <p class="muted">Itens gerados a partir dos critérios que ficaram pendentes nos simulados.</p>
+      <div id="phase2-reviews" class="empty muted">Nenhuma revisão pendente.</div>
+    </section>
+    <section class="card content-card">
       <h2>Segurança da conta</h2>
       <p class="muted">Troque sua senha periodicamente. Ela nunca é exibida nem armazenada em texto aberto.</p>
       <input id="current-password" type="password" autocomplete="current-password" placeholder="Senha atual">
@@ -193,13 +198,14 @@
     document.querySelector('#start-timer').addEventListener('click',()=>{localStorage.setItem('oabPhase2TimerEnd',String(Date.now()+5*60*60*1000));clearInterval(timerInterval);renderTimer();timerInterval=setInterval(renderTimer,1000);});
     if(localStorage.getItem('oabPhase2TimerEnd')){renderTimer();timerInterval=setInterval(renderTimer,1000);}
     async function loadPerformance(){const response=await fetch('/api/performance');if(!response.ok)return;const data=await response.json();const container=document.querySelector('#performance');if(!data.objective.length&&!data.discursive.length&&!data.phase2.length){container.textContent='Ainda não há tentativas registradas.';return;}container.innerHTML='';data.objective.forEach(item=>{const row=document.createElement('div');row.className='lesson';row.innerHTML=`<strong>${item.subject}</strong><span>Objetivas: ${item.score}/${item.total} em ${item.attempts} tentativa(s).</span>`;container.appendChild(row);});data.discursive.forEach(item=>{const row=document.createElement('div');row.className='lesson';row.innerHTML=`<strong>${item.subject}</strong><span>Discursivas: ${item.score}/${item.max_score} pontos em ${item.attempts} resposta(s).</span>`;container.appendChild(row);});data.phase2.forEach(item=>{const row=document.createElement('div');row.className='lesson';row.innerHTML=`<strong>${item.subject}</strong><span>Simulados da 2ª fase: ${item.score}/${item.max_score} pontos em ${item.attempts} tentativa(s).</span>`;container.appendChild(row);});}
+    async function loadPhase2Reviews(){const response=await fetch('/api/phase2/reviews');if(!response.ok)return;const data=await response.json();const container=document.querySelector('#phase2-reviews');if(!data.reviews.length){container.textContent='Nenhuma revisão pendente.';return;}container.innerHTML='';data.reviews.forEach(review=>{const row=document.createElement('label');row.className='review';row.innerHTML=`<input type="checkbox" ${review.completed?'checked':''}><span><strong>${review.title} · ${review.subject}</strong><small>${review.detail}</small></span>`;const input=row.querySelector('input');input.addEventListener('change',async()=>{await fetch(`/api/phase2/reviews/${review.id}/complete`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({completed:input.checked})});});container.appendChild(row);});}
     document.querySelectorAll('.plans button').forEach(button => button.addEventListener('click', async () => {
       const days=Number(button.dataset.days); const response=await fetch('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({days})});
       if(response.ok){currentDays=days;await loadTasks();} else message.textContent='Não foi possível trocar o plano.';
     }));
     document.querySelector('#change-password').addEventListener('click',async()=>{const status=document.querySelector('#password-status');const response=await fetch('/api/account/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:document.querySelector('#current-password').value,new_password:document.querySelector('#new-password').value})});const data=await response.json();status.textContent=data.message||'Operação concluída.';if(response.ok){document.querySelector('#current-password').value='';document.querySelector('#new-password').value='';}});
     document.querySelector('#logout').addEventListener('click', async()=>{await fetch('/api/logout',{method:'POST'});window.location.href='/login.html';});
-    (async()=>{if(await loadMe()){await loadTasks();await loadSubjects();await loadCalendar();await loadReviews();await loadPerformance();}})();
+    (async()=>{if(await loadMe()){await loadTasks();await loadSubjects();await loadCalendar();await loadReviews();await loadPerformance();await loadPhase2Reviews();}})();
   </script>
 </body>
 </html>
