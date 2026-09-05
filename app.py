@@ -1007,11 +1007,13 @@ def admin_contents():
     try:
         subjects_rows = fetch_all(conn, "SELECT id, name, phase, question_weight FROM subjects ORDER BY sort_order")
         lessons_rows = fetch_all(conn, "SELECT id, subject_id, title, summary, source_note FROM lessons ORDER BY subject_id, sort_order")
-        questions_count = fetch_all(conn, "SELECT subject_id, COUNT(*) FROM questions GROUP BY subject_id")
+        questions_rows = fetch_all(conn, "SELECT id, subject_id, prompt, options_json, answer_index, explanation, source_note FROM questions ORDER BY subject_id, id")
     finally:
         conn.close()
-    counts = {row[0]: row[1] for row in questions_count}
-    return jsonify({"ok": True, "subjects": [{"id": r[0], "name": r[1], "phase": r[2], "question_weight": r[3], "questions": counts.get(r[0], 0)} for r in subjects_rows], "lessons": [{"id": r[0], "subject_id": r[1], "title": r[2], "summary": r[3], "source_note": r[4]} for r in lessons_rows]})
+    counts = {}
+    for row in questions_rows:
+        counts[row[1]] = counts.get(row[1], 0) + 1
+    return jsonify({"ok": True, "subjects": [{"id": r[0], "name": r[1], "phase": r[2], "question_weight": r[3], "questions": counts.get(r[0], 0)} for r in subjects_rows], "lessons": [{"id": r[0], "subject_id": r[1], "title": r[2], "summary": r[3], "source_note": r[4]} for r in lessons_rows], "questions": [{"id": r[0], "subject_id": r[1], "prompt": r[2], "options": json.loads(r[3]), "answer_index": r[4], "explanation": r[5], "source_note": r[6]} for r in questions_rows]})
 
 
 @app.post("/api/admin/lessons")
@@ -1034,6 +1036,86 @@ def admin_add_lesson():
     finally:
         conn.close()
     return jsonify({"ok": True, "message": "Aula adicionada."}), 201
+
+
+@app.patch("/api/admin/lessons/<int:lesson_id>")
+@admin_required
+def admin_edit_lesson(lesson_id):
+    payload = request.get_json(silent=True) or {}
+    title = str(payload.get("title", "")).strip()
+    summary = str(payload.get("summary", "")).strip()
+    source_note = str(payload.get("source_note", "Material autoral OAB FÁCIL; confira a fonte oficial vigente.")).strip()
+    if not title or not summary:
+        return jsonify({"message": "Informe título e resumo."}), 400
+    conn = connection()
+    try:
+        execute(conn, "UPDATE lessons SET title = %s, summary = %s, source_note = %s WHERE id = %s", (title, summary, source_note, lesson_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": "Aula atualizada."})
+
+
+@app.delete("/api/admin/lessons/<int:lesson_id>")
+@admin_required
+def admin_delete_lesson(lesson_id):
+    conn = connection()
+    try:
+        execute(conn, "DELETE FROM lessons WHERE id = %s", (lesson_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": "Aula excluída."})
+
+
+@app.patch("/api/admin/questions/<int:question_id>")
+@admin_required
+def admin_edit_question(question_id):
+    payload = request.get_json(silent=True) or {}
+    prompt = str(payload.get("prompt", "")).strip()
+    options = payload.get("options", [])
+    explanation = str(payload.get("explanation", "")).strip()
+    try:
+        answer_index = int(payload.get("answer_index"))
+    except (TypeError, ValueError):
+        return jsonify({"message": "Índice da alternativa inválido."}), 400
+    if not prompt or not isinstance(options, list) or len(options) != 4 or answer_index not in range(4) or not explanation:
+        return jsonify({"message": "Confira enunciado, quatro alternativas, resposta e explicação."}), 400
+    conn = connection()
+    try:
+        execute(conn, "UPDATE questions SET prompt = %s, options_json = %s, answer_index = %s, explanation = %s WHERE id = %s", (prompt, json.dumps([str(item).strip() for item in options]), answer_index, explanation, question_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": "Questão atualizada."})
+
+
+@app.delete("/api/admin/questions/<int:question_id>")
+@admin_required
+def admin_delete_question(question_id):
+    conn = connection()
+    try:
+        execute(conn, "DELETE FROM questions WHERE id = %s", (question_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": "Questão excluída."})
+
+
+@app.get("/api/admin/desempenho")
+@admin_required
+def admin_performance():
+    conn = connection()
+    try:
+        rows = fetch_all(conn, """SELECT u.name, u.email, s.name, COUNT(a.id), COALESCE(SUM(a.score), 0), COALESCE(SUM(a.total), 0)
+            FROM quiz_attempts a JOIN users u ON u.id = a.user_id JOIN subjects s ON s.id = a.subject_id
+            GROUP BY u.name, u.email, s.name ORDER BY u.name, s.name""")
+        discursive = fetch_all(conn, """SELECT u.name, u.email, s.name, COUNT(d.id), COALESCE(SUM(d.score), 0)
+            FROM discursive_attempts d JOIN users u ON u.id = d.user_id JOIN subjects s ON s.id = d.subject_id
+            GROUP BY u.name, u.email, s.name ORDER BY u.name, s.name""")
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "objective": [{"name": r[0], "email": r[1], "subject": r[2], "attempts": r[3], "score": r[4], "total": r[5]} for r in rows], "discursive": [{"name": r[0], "email": r[1], "subject": r[2], "attempts": r[3], "score": r[4]} for r in discursive]})
 
 
 @app.post("/api/admin/questions")
