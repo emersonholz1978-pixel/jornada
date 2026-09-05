@@ -21,6 +21,15 @@
       <button type="submit">Entrar</button>
     </form>
     <p id="message" role="status"></p>
+    <details>
+      <summary>Esqueci minha senha</summary>
+      <p class="muted">Informe seu e-mail. Se houver uma conta, enviaremos um link válido por 30 minutos.</p>
+      <form id="forgot-form"><label for="forgot-email">E-mail</label><input id="forgot-email" type="email" required><button type="submit">Solicitar recuperação</button></form>
+    </details>
+    <details id="reset-box">
+      <summary>Já tenho um token de recuperação</summary>
+      <form id="reset-form"><label for="reset-token">Token</label><input id="reset-token" autocomplete="off" required><label for="reset-password">Nova senha</label><input id="reset-password" type="password" minlength="8" autocomplete="new-password" required><button type="submit">Redefinir senha</button></form>
+    </details>
     <a class="back" href="/">← Voltar ao site</a>
   </main>
   <script>
@@ -38,6 +47,10 @@
     });
     const email = document.querySelector('#email');
     const password = document.querySelector('#password');
+    const message = document.querySelector('#message');
+    document.querySelector('#forgot-form').addEventListener('submit', async event => {event.preventDefault();const response=await fetch('/api/password/forgot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.querySelector('#forgot-email').value.trim()})});const data=await response.json();message.textContent=data.message||'Solicitação processada.';});
+    document.querySelector('#reset-form').addEventListener('submit', async event => {event.preventDefault();const response=await fetch('/api/password/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:document.querySelector('#reset-token').value.trim(),new_password:document.querySelector('#reset-password').value})});const data=await response.json();message.textContent=data.message||'Operação processada.';if(response.ok){setTimeout(()=>window.location.href='/aluno',700);}});
+    const queryToken=new URLSearchParams(window.location.search).get('token');if(queryToken){document.querySelector('#reset-token').value=queryToken;document.querySelector('#reset-box').open=true;}
   </script>
 </body>
 </html>

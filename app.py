@@ -5,6 +5,9 @@ import os
 import re
 import sqlite3
 import secrets
+import hashlib
+import smtplib
+from email.message import EmailMessage
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 
@@ -16,6 +19,12 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 SQLITE_PATH = os.getenv("SQLITE_PATH", "/tmp/oab_facil.db")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 SESSION_SECRET = os.getenv("SESSION_SECRET", "") or secrets.token_hex(32)
+PUBLIC_URL = os.getenv("PUBLIC_URL", "https://oab-facil.onrender.com").rstrip("/")
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+MAIL_FROM = os.getenv("MAIL_FROM", SMTP_USER).strip()
 
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
 app.secret_key = SESSION_SECRET
@@ -58,6 +67,26 @@ def fetch_all(conn, sql, params=()):
     return [tuple(row) if not isinstance(row, tuple) else row for row in rows]
 
 
+def token_digest(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def send_reset_email(email, token):
+    if not (SMTP_HOST and MAIL_FROM):
+        return False
+    message = EmailMessage()
+    message["Subject"] = "Recuperação de senha — OAB FÁCIL"
+    message["From"] = MAIL_FROM
+    message["To"] = email
+    message.set_content(f"Solicitação de recuperação de senha do OAB FÁCIL. Acesse {PUBLIC_URL}/login.html?token={token} para criar uma nova senha. Este link expira em 30 minutos. Se você não solicitou, ignore esta mensagem.")
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+        smtp.starttls()
+        if SMTP_USER and SMTP_PASSWORD:
+            smtp.login(SMTP_USER, SMTP_PASSWORD)
+        smtp.send_message(message)
+    return True
+
+
 def ensure_schema():
     conn = connection()
     try:
@@ -72,6 +101,10 @@ def ensure_schema():
                     email VARCHAR(254) NOT NULL UNIQUE, password_hash TEXT NOT NULL,
                     consent_at TIMESTAMPTZ NOT NULL, plan_days INTEGER NOT NULL DEFAULT 30,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+                """CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    token_hash VARCHAR(128) NOT NULL UNIQUE, expires_at TIMESTAMPTZ NOT NULL,
+                    used_at TIMESTAMPTZ NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
                 """CREATE TABLE IF NOT EXISTS study_tasks (
                     id BIGSERIAL PRIMARY KEY, plan_days INTEGER NOT NULL,
                     day_number INTEGER NOT NULL, title VARCHAR(180) NOT NULL,
@@ -135,6 +168,10 @@ def ensure_schema():
                     email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
                     consent_at TEXT NOT NULL, plan_days INTEGER NOT NULL DEFAULT 30,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                    token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL,
+                    used_at TEXT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
                 """CREATE TABLE IF NOT EXISTS study_tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, plan_days INTEGER NOT NULL,
                     day_number INTEGER NOT NULL, title TEXT NOT NULL,
@@ -652,6 +689,61 @@ def login():
     session.clear()
     session["user_id"] = row[0]
     return jsonify({"ok": True, "message": "Login realizado."})
+
+
+@app.post("/api/password/forgot")
+def forgot_password():
+    payload = request.get_json(silent=True) or request.form
+    email = str(payload.get("email", "")).strip().lower()
+    # A resposta é sempre genérica para não revelar quais e-mails têm conta.
+    if EMAIL_RE.match(email):
+        conn = connection()
+        try:
+            row = fetch_one(conn, "SELECT id FROM users WHERE email = %s", (email,))
+            if row:
+                raw_token = secrets.token_urlsafe(32)
+                digest = token_digest(raw_token)
+                expires = datetime.now(timezone.utc) + timedelta(minutes=30)
+                execute(conn, "DELETE FROM password_reset_tokens WHERE user_id = %s AND used_at IS NULL", (row[0],))
+                execute(conn, "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (%s, %s, %s)", (row[0], digest, expires))
+                conn.commit()
+                try:
+                    send_reset_email(email, raw_token)
+                except (OSError, smtplib.SMTPException):
+                    # O token permanece protegido no banco; não é exposto em resposta ou log.
+                    pass
+        finally:
+            conn.close()
+    return jsonify({"ok": True, "message": "Se o e-mail estiver cadastrado, enviaremos instruções de recuperação."})
+
+
+@app.post("/api/password/reset")
+def reset_password():
+    payload = request.get_json(silent=True) or request.form
+    raw_token = str(payload.get("token", "")).strip()
+    new_password = str(payload.get("new_password", ""))
+    if len(raw_token) < 20 or len(new_password) < 8:
+        return jsonify({"ok": False, "message": "Token inválido ou senha com menos de 8 caracteres."}), 400
+    conn = connection()
+    try:
+        row = fetch_one(conn, "SELECT id, user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = %s", (token_digest(raw_token),))
+        if not row or row[3]:
+            return jsonify({"ok": False, "message": "Token inválido ou já utilizado."}), 400
+        expires = row[2]
+        if isinstance(expires, str):
+            expires = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if expires <= datetime.now(timezone.utc):
+            return jsonify({"ok": False, "message": "Este token expirou. Solicite uma nova recuperação."}), 400
+        execute(conn, "UPDATE users SET password_hash = %s WHERE id = %s", (generate_password_hash(new_password), row[1]))
+        execute(conn, "UPDATE password_reset_tokens SET used_at = %s WHERE id = %s", (datetime.now(timezone.utc), row[0]))
+        conn.commit()
+    finally:
+        conn.close()
+    session.clear()
+    session["user_id"] = row[1]
+    return jsonify({"ok": True, "message": "Senha redefinida com sucesso."})
 
 
 @app.post("/api/account/password")
