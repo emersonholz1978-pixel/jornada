@@ -1,42 +1,58 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cadastros — OAB FÁCIL</title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel administrativo — OAB FÁCIL</title>
   <style>
-    :root{font-family:Inter,Arial,sans-serif;color:#17233b;background:#f6f8fb}body{max-width:760px;margin:48px auto;padding:0 20px}main{background:#fff;border:1px solid #e5e9f0;border-radius:16px;padding:28px;box-shadow:0 10px 30px #17233b12}h1{margin-top:0}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}input{flex:1;min-width:240px;padding:12px;border:1px solid #ccd4e0;border-radius:8px}button{padding:12px 16px;border:0;border-radius:8px;background:#c49a48;color:#17233b;font-weight:700;cursor:pointer}#status{margin-top:18px}.muted{color:#667085;font-size:.92rem}
+    :root{font-family:Inter,Arial,sans-serif;color:#17233b;background:#f6f8fb}body{max-width:1000px;margin:36px auto;padding:0 20px}main{background:#fff;border:1px solid #e5e9f0;border-radius:16px;padding:28px;box-shadow:0 10px 30px #17233b12}h1{margin-top:0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px}.card{border:1px solid #e5e9f0;border-radius:12px;padding:20px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}input,textarea,select{width:100%;box-sizing:border-box;margin:7px 0 12px;padding:11px;border:1px solid #ccd4e0;border-radius:8px;font:inherit}textarea{min-height:90px}button{padding:11px 15px;border:0;border-radius:8px;background:#c49a48;color:#17233b;font-weight:700;cursor:pointer}.muted{color:#667085;font-size:.92rem}#status{margin-top:16px;min-height:22px}.list{margin-top:14px;max-height:260px;overflow:auto}.item{border-top:1px solid #edf0f4;padding:10px 0}.item strong{display:block}.small{font-size:.85rem;color:#667085}.danger{color:#9c3030}@media(max-width:760px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
   <main>
-    <h1>Cadastros do OAB FÁCIL</h1>
-    <p class="muted">Informe o token administrativo configurado no Render. Ele não é armazenado nesta página.</p>
-    <div class="row"><input id="token" type="password" placeholder="Token administrativo" autocomplete="off"><button id="load">Consultar</button></div>
+    <h1>Painel administrativo do OAB FÁCIL</h1>
+    <p class="muted">O token é usado somente nas requisições desta página e não é salvo no navegador.</p>
+    <div class="row"><input id="token" type="password" placeholder="Token administrativo" autocomplete="off"><button id="load">Carregar painel</button><button id="download" hidden>Baixar CSV</button></div>
     <p id="status" role="status"></p>
-    <button id="download" hidden>Baixar CSV dos cadastros</button>
+    <section class="grid" id="content-panel" hidden>
+      <div class="card">
+        <h2>Adicionar aula</h2>
+        <label>Disciplina<select id="lesson-subject"></select></label>
+        <label>Título<input id="lesson-title" placeholder="Ex.: Prerrogativas profissionais"></label>
+        <label>Resumo<textarea id="lesson-summary" placeholder="Resumo do conteúdo para o aluno"></textarea></label>
+        <label>Fonte/observação<input id="lesson-source" value="Material autoral OAB FÁCIL; confira a fonte oficial vigente."></label>
+        <button id="add-lesson">Publicar aula</button>
+      </div>
+      <div class="card">
+        <h2>Adicionar questão</h2>
+        <label>Disciplina<select id="question-subject"></select></label>
+        <label>Enunciado<textarea id="question-prompt"></textarea></label>
+        <label>Alternativa A<input id="option-0"></label>
+        <label>Alternativa B<input id="option-1"></label>
+        <label>Alternativa C<input id="option-2"></label>
+        <label>Alternativa D<input id="option-3"></label>
+        <label>Índice da correta (A=0, B=1, C=2, D=3)<input id="answer-index" type="number" min="0" max="3" value="0"></label>
+        <label>Explicação<textarea id="explanation"></textarea></label>
+        <button id="add-question">Publicar questão</button>
+      </div>
+      <div class="card"><h2>Disciplinas</h2><div id="subjects" class="list"></div></div>
+      <div class="card"><h2>Aulas cadastradas</h2><div id="lessons" class="list"></div></div>
+    </section>
   </main>
   <script>
-    const token = document.querySelector('#token');
-    const status = document.querySelector('#status');
-    const download = document.querySelector('#download');
-    document.querySelector('#load').addEventListener('click', async () => {
-      status.textContent = 'Consultando…'; download.hidden = true;
-      try {
-        const response = await fetch('/api/admin/resumo', {headers: {'X-Admin-Token': token.value}});
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Não foi possível consultar.');
-        status.textContent = `Total de cadastros: ${data.total}`;
-        download.hidden = false;
-      } catch (error) { status.textContent = error.message; }
-    });
-    download.addEventListener('click', async () => {
-      const response = await fetch('/api/admin/cadastros.csv', {headers: {'X-Admin-Token': token.value}});
-      if (!response.ok) { status.textContent = 'Não foi possível baixar os cadastros.'; return; }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob); const link = document.createElement('a');
-      link.href = url; link.download = 'oab-facil-cadastros.csv'; link.click(); URL.revokeObjectURL(url);
-    });
+    const $=id=>document.querySelector(id), token=$('#token'), status=$('#status'); let subjects=[];
+    function headers(){return {'Content-Type':'application/json','X-Admin-Token':token.value};}
+    function fillSubjects(){['#lesson-subject','#question-subject'].forEach(selector=>{$(selector).innerHTML=subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');});$('#subjects').innerHTML=subjects.map(s=>`<div class="item"><strong>${s.name}</strong><span class="small">${s.phase} · referência: ${s.question_weight} questões · ${s.questions} cadastradas</span></div>`).join('');}
+    async function loadPanel(){
+      status.textContent='Carregando…';
+      const response=await fetch('/api/admin/conteudos',{headers:{'X-Admin-Token':token.value}}); const data=await response.json();
+      if(!response.ok) throw new Error(data.error||data.message||'Não foi possível carregar.');
+      subjects=data.subjects; fillSubjects(); $('#lessons').innerHTML=data.lessons.map(l=>`<div class="item"><strong>${l.title}</strong><span class="small">${subjects.find(s=>s.id===l.subject_id)?.name||'Disciplina'} · ${l.summary}</span></div>`).join('')||'<p class="muted">Nenhuma aula.</p>';
+      $('#content-panel').hidden=false; $('#download').hidden=false; status.textContent=`Painel carregado: ${data.lessons.length} aulas e ${subjects.reduce((sum,s)=>sum+s.questions,0)} questões.`;
+    }
+    $('#load').addEventListener('click',()=>loadPanel().catch(e=>status.textContent=e.message));
+    $('#download').addEventListener('click',async()=>{const r=await fetch('/api/admin/cadastros.csv',{headers:{'X-Admin-Token':token.value}});if(!r.ok){status.textContent='Não foi possível baixar o CSV.';return;}const blob=await r.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='oab-facil-cadastros.csv';a.click();URL.revokeObjectURL(url);});
+    $('#add-lesson').addEventListener('click',async()=>{const r=await fetch('/api/admin/lessons',{method:'POST',headers:headers(),body:JSON.stringify({subject_id:Number($('#lesson-subject').value),title:$('#lesson-title').value,summary:$('#lesson-summary').value,source_note:$('#lesson-source').value})});const d=await r.json();status.textContent=d.message||'Aula processada.';if(r.ok){$('#lesson-title').value='';$('#lesson-summary').value='';await loadPanel();}});
+    $('#add-question').addEventListener('click',async()=>{const r=await fetch('/api/admin/questions',{method:'POST',headers:headers(),body:JSON.stringify({subject_id:Number($('#question-subject').value),prompt:$('#question-prompt').value,options:[0,1,2,3].map(i=>$(`#option-${i}`).value),answer_index:Number($('#answer-index').value),explanation:$('#explanation').value})});const d=await r.json();status.textContent=d.message||'Questão processada.';if(r.ok){$('#question-prompt').value='';await loadPanel();}});
   </script>
 </body>
 </html>

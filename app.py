@@ -583,6 +583,69 @@ def complete_task(task_id):
     return jsonify({"ok": True})
 
 
+@app.get("/api/admin/conteudos")
+@admin_required
+def admin_contents():
+    conn = connection()
+    try:
+        subjects_rows = fetch_all(conn, "SELECT id, name, phase, question_weight FROM subjects ORDER BY sort_order")
+        lessons_rows = fetch_all(conn, "SELECT id, subject_id, title, summary, source_note FROM lessons ORDER BY subject_id, sort_order")
+        questions_count = fetch_all(conn, "SELECT subject_id, COUNT(*) FROM questions GROUP BY subject_id")
+    finally:
+        conn.close()
+    counts = {row[0]: row[1] for row in questions_count}
+    return jsonify({"ok": True, "subjects": [{"id": r[0], "name": r[1], "phase": r[2], "question_weight": r[3], "questions": counts.get(r[0], 0)} for r in subjects_rows], "lessons": [{"id": r[0], "subject_id": r[1], "title": r[2], "summary": r[3], "source_note": r[4]} for r in lessons_rows]})
+
+
+@app.post("/api/admin/lessons")
+@admin_required
+def admin_add_lesson():
+    payload = request.get_json(silent=True) or {}
+    subject_id = int(payload.get("subject_id", 0) or 0)
+    title = str(payload.get("title", "")).strip()
+    summary = str(payload.get("summary", "")).strip()
+    source_note = str(payload.get("source_note", "Material autoral OAB FÁCIL; confira a fonte oficial vigente.")).strip()
+    if not subject_id or not title or not summary or len(title) > 180:
+        return jsonify({"message": "Preencha disciplina, título e resumo."}), 400
+    conn = connection()
+    try:
+        if is_postgres():
+            execute(conn, "INSERT INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (%s, %s, %s, %s, 99) ON CONFLICT DO NOTHING", (subject_id, title, summary, source_note))
+        else:
+            execute(conn, "INSERT OR IGNORE INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (%s, %s, %s, %s, 99)", (subject_id, title, summary, source_note))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": "Aula adicionada."}), 201
+
+
+@app.post("/api/admin/questions")
+@admin_required
+def admin_add_question():
+    payload = request.get_json(silent=True) or {}
+    subject_id = int(payload.get("subject_id", 0) or 0)
+    prompt = str(payload.get("prompt", "")).strip()
+    options = payload.get("options", [])
+    answer_index = payload.get("answer_index")
+    explanation = str(payload.get("explanation", "")).strip()
+    source_note = str(payload.get("source_note", "Questão autoral OAB FÁCIL; confira a fonte oficial vigente.")).strip()
+    if not subject_id or not prompt or not isinstance(options, list) or len(options) < 2 or not all(str(item).strip() for item in options):
+        return jsonify({"message": "Informe a disciplina, enunciado e pelo menos duas alternativas."}), 400
+    try:
+        answer_index = int(answer_index)
+    except (TypeError, ValueError):
+        return jsonify({"message": "Informe o índice da alternativa correta."}), 400
+    if answer_index < 0 or answer_index >= len(options) or not explanation:
+        return jsonify({"message": "Confira a alternativa correta e a explicação."}), 400
+    conn = connection()
+    try:
+        execute(conn, "INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (%s, %s, %s, %s, %s, %s)", (subject_id, prompt, json.dumps([str(item).strip() for item in options]), answer_index, explanation, source_note))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": "Questão adicionada."}), 201
+
+
 @app.get("/api/admin/cadastros.csv")
 @admin_required
 def registrations_csv():
