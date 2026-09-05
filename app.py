@@ -197,6 +197,18 @@ def ensure_schema():
             (ethics, "Código de Ética e deveres profissionais", "Revise sigilo, independência, urbanidade, lealdade e relação com o cliente.", "Material autoral de revisão; confira sempre o texto oficial vigente.", 7),
             (ethics, "Revisão por questões", "Faça um bloco de questões autorais e registre os pontos que precisam voltar para a revisão.", "Questões autorais do OAB FÁCIL; não reproduz questões protegidas de terceiros.", 8),
         ]
+        civil = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Direito Civil",))[0]
+        constitutional = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Direito Constitucional",))[0]
+        lesson_rows += [
+            (civil, "Pessoas e personalidade", "Revise capacidade, direitos da personalidade e proteção jurídica da pessoa.", "Material autoral OAB FÁCIL; confira o Código Civil vigente.", 1),
+            (civil, "Obrigações e responsabilidade civil", "Organize obrigação, dano, nexo causal e as hipóteses gerais de responsabilização.", "Material autoral OAB FÁCIL; confira o Código Civil vigente.", 2),
+            (civil, "Contratos e boa-fé", "Estude formação, interpretação e função da boa-fé objetiva nos contratos.", "Material autoral OAB FÁCIL; confira o Código Civil vigente.", 3),
+            (civil, "Revisão por questões de Civil", "Faça questões e registre os conceitos que precisam de nova revisão.", "Material autoral OAB FÁCIL; confira a fonte oficial vigente.", 4),
+            (constitutional, "Princípios fundamentais", "Revise fundamentos da República, objetivos fundamentais e princípios estruturantes.", "Material autoral OAB FÁCIL; confira a Constituição vigente.", 1),
+            (constitutional, "Direitos e garantias fundamentais", "Organize direitos individuais, coletivos e instrumentos de proteção constitucional.", "Material autoral OAB FÁCIL; confira a Constituição vigente.", 2),
+            (constitutional, "Organização dos Poderes", "Estude a separação funcional, controles e competências previstas na Constituição.", "Material autoral OAB FÁCIL; confira a Constituição vigente.", 3),
+            (constitutional, "Controle de constitucionalidade", "Monte um quadro com noções de controle difuso, concentrado e efeitos das decisões.", "Material autoral OAB FÁCIL; confira a Constituição e a legislação vigente.", 4),
+        ]
         if is_postgres():
             with conn.cursor() as cur:
                 cur.executemany("INSERT INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING", lesson_rows)
@@ -212,13 +224,27 @@ def ensure_schema():
             (ethics, "O impedimento profissional, em comparação com a incompatibilidade, é normalmente:", json.dumps(["Uma proibição parcial em situações determinadas.", "Uma proibição total em qualquer atividade.", "Uma sanção criminal.", "Uma forma de inscrição provisória."]), 0, "O impedimento limita o exercício em determinadas situações; a incompatibilidade tem alcance total enquanto durar a causa.", "Questão autoral OAB FÁCIL; confira o Estatuto vigente."),
             (ethics, "Ao revisar o Código de Ética, uma boa prática de estudo é:", json.dumps(["Memorizar frases isoladas sem conferir a fonte.", "Ignorar alterações normativas.", "Relacionar deveres, condutas, consequências e a fonte oficial vigente.", "Usar apenas resumos antigos."]), 2, "A revisão deve conectar deveres, condutas e consequências, sempre conferindo a legislação e a regulamentação atualizadas.", "Questão autoral OAB FÁCIL; material de estudo, não substitui a fonte oficial."),
         ]
-        existing_questions = fetch_one(conn, "SELECT COUNT(*) FROM questions WHERE subject_id = %s", (ethics,))[0]
-        if existing_questions == 0:
-            if is_postgres():
-                with conn.cursor() as cur:
-                    cur.executemany("INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (%s, %s, %s, %s, %s, %s)", question_rows)
-            else:
-                conn.executemany("INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (?, ?, ?, ?, ?, ?)", question_rows)
+        civil_questions = [
+            (civil, "Na responsabilidade civil, a análise geral costuma considerar:", json.dumps(["Apenas a intenção do agente.", "Conduta, dano e nexo causal, sem prejuízo das regras específicas.", "Somente a existência de contrato escrito.", "Apenas o valor econômico do pedido."]), 1, "A análise da responsabilidade civil normalmente parte da conduta, do dano e do nexo causal, observadas as hipóteses legais específicas.", "Questão autoral OAB FÁCIL; confira o Código Civil vigente."),
+            (civil, "A boa-fé objetiva nos contratos está relacionada principalmente a:", json.dumps(["Deveres de lealdade, cooperação e correção na relação contratual.", "Dispensa de qualquer obrigação contratual.", "Possibilidade de ocultar informação relevante.", "Proibição de interpretar o contrato."]), 0, "A boa-fé objetiva orienta padrões de lealdade, cooperação e correção, inclusive na formação e execução contratual.", "Questão autoral OAB FÁCIL; confira o Código Civil vigente."),
+            (civil, "Os direitos da personalidade protegem, entre outros aspectos:", json.dumps(["Somente bens comerciais.", "A dimensão pessoal, como honra, imagem e privacidade, conforme a lei.", "Apenas direitos políticos.", "Somente relações empresariais."]), 1, "Os direitos da personalidade protegem aspectos essenciais da pessoa, observados os limites e a disciplina legal.", "Questão autoral OAB FÁCIL; confira o Código Civil vigente."),
+            (civil, "Uma revisão eficiente de Direito Civil deve:", json.dumps(["Separar conceitos sem relacioná-los a casos.", "Combinar conceitos, dispositivos, exemplos e questões.", "Usar somente material sem data.", "Ignorar exceções legais."]), 1, "A preparação deve relacionar conceitos, texto legal, exemplos e questões, com conferência da fonte vigente.", "Questão autoral OAB FÁCIL; material de estudo, não substitui a fonte oficial."),
+        ]
+        constitutional_questions = [
+            (constitutional, "O habeas corpus protege diretamente:", json.dumps(["A liberdade de locomoção, nas hipóteses constitucionais.", "Exclusivamente o patrimônio público.", "Somente direitos autorais.", "Apenas relações contratuais."]), 0, "O habeas corpus é remédio constitucional ligado à liberdade de locomoção, conforme os requisitos legais.", "Questão autoral OAB FÁCIL; confira a Constituição vigente."),
+            (constitutional, "A separação de Poderes busca:", json.dumps(["Concentrar todas as funções em um único órgão.", "Organizar funções estatais com independência e controles recíprocos.", "Eliminar o Poder Judiciário.", "Impedir qualquer fiscalização institucional."]), 1, "A separação de Poderes organiza funções estatais e convive com mecanismos de independência e controle recíproco.", "Questão autoral OAB FÁCIL; confira a Constituição vigente."),
+            (constitutional, "As normas definidoras dos direitos e garantias fundamentais têm, pela Constituição, regra de:", json.dumps(["Aplicação imediata, observadas as condições constitucionais e legais.", "Aplicação somente após lei municipal.", "Aplicação proibida no setor privado.", "Revogação automática após um ano."]), 0, "A Constituição estabelece a regra da aplicação imediata dos direitos e garantias fundamentais, sem afastar a análise do caso concreto.", "Questão autoral OAB FÁCIL; confira a Constituição vigente."),
+            (constitutional, "Na revisão constitucional, é importante conferir:", json.dumps(["Somente comentários antigos.", "O texto constitucional vigente, a jurisprudência e as leis relacionadas.", "Apenas notícias sem fonte.", "Somente modelos de petição."]), 1, "O estudo constitucional exige conferência do texto vigente e das fontes interpretativas pertinentes.", "Questão autoral OAB FÁCIL; material de estudo, não substitui a fonte oficial."),
+        ]
+        question_groups = {ethics: question_rows, civil: civil_questions, constitutional: constitutional_questions}
+        for subject_id, rows_to_seed in question_groups.items():
+            existing_questions = fetch_one(conn, "SELECT COUNT(*) FROM questions WHERE subject_id = %s", (subject_id,))[0]
+            if existing_questions == 0:
+                if is_postgres():
+                    with conn.cursor() as cur:
+                        cur.executemany("INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (%s, %s, %s, %s, %s, %s)", rows_to_seed)
+                else:
+                    conn.executemany("INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (?, ?, ?, ?, ?, ?)", rows_to_seed)
 
         for days in (30, 60, 90):
             existing = fetch_one(conn, "SELECT COUNT(*) FROM study_tasks WHERE plan_days = %s", (days,))[0]
