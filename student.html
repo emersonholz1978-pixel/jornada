@@ -44,8 +44,14 @@
     <section class="card content-card">
       <h2>Trilha inicial da 2ª fase</h2>
       <p class="muted">Escolha uma área para consultar peças práticas, fundamentos, questões discursivas e gestão da prova de cinco horas.</p>
+      <button id="start-timer" class="quiz-start">Iniciar cronômetro de 5 horas</button> <strong id="exam-timer">05:00:00</strong>
       <div id="phase2-subjects" class="plans"></div>
       <div id="phase2-lessons" class="empty muted">Selecione uma área da 2ª fase.</div>
+    </section>
+    <section class="card content-card">
+      <h2>Meu desempenho</h2>
+      <p class="muted">Acompanhe tentativas objetivas e autoavaliações discursivas por disciplina.</p>
+      <div id="performance" class="empty muted">Ainda não há tentativas registradas.</div>
     </section>
     <section class="dashboard-grid content-card">
       <div class="card"><h2>Calendário</h2><p class="muted">Revisões e marcos do seu plano.</p><div id="calendar" class="empty muted">Carregando calendário…</div></div>
@@ -167,15 +173,20 @@
         const materialResponse=await fetch(`/api/phase2/materials?subject=${subjectId}`); if(!materialResponse.ok) return;
         const materials=await materialResponse.json();
         materials.pieces.forEach(piece=>{const item=document.createElement('article');item.className='lesson';item.innerHTML=`<strong>Peça prática: ${piece.title}</strong><span><b>Enunciado:</b> ${piece.scenario}</span><span><b>Estrutura:</b> ${piece.structure}</span><span><b>Checklist:</b> ${piece.checklist}</span><small class="muted">${piece.source_note}</small>`;container.appendChild(item);});
-        materials.discursives.forEach(question=>{const item=document.createElement('article');item.className='lesson';item.innerHTML=`<strong>Questão discursiva</strong><span>${question.prompt}</span><details><summary>Ver resposta orientadora</summary><span>${question.model_answer}</span></details><small class="muted">${question.source_note}</small>`;container.appendChild(item);});
+        materials.discursives.forEach(question=>{const item=document.createElement('article');item.className='lesson';item.innerHTML=`<strong>Questão discursiva</strong><span>${question.prompt}</span><textarea rows="5" placeholder="Escreva sua resposta fundamentada..."></textarea><span><label><input type="checkbox" data-criterion="cabimento"> Cabimento</label> <label><input type="checkbox" data-criterion="fundamento"> Fundamento</label> <label><input type="checkbox" data-criterion="aplicacao"> Aplicação</label> <label><input type="checkbox" data-criterion="conclusao"> Conclusão</label> <label><input type="checkbox" data-criterion="clareza"> Clareza</label></span><button class="quiz-submit assess-discursive">Avaliar resposta</button><small class="muted">${question.source_note}</small>`;const assess=item.querySelector('.assess-discursive');assess.addEventListener('click',async()=>{const criteria={};item.querySelectorAll('[data-criterion]').forEach(box=>criteria[box.dataset.criterion]=box.checked);const answer=item.querySelector('textarea').value;assess.disabled=true;const result=await fetch('/api/phase2/discursive/assess',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject_id:subjectId,question_id:question.id,answer,criteria})});const data=await result.json();const feedback=document.createElement('div');feedback.className='quiz-result';feedback.textContent=result.ok?`Autoavaliação: ${data.score}/10 — ${data.feedback}`:(data.message||'Não foi possível avaliar.');item.appendChild(feedback);assess.disabled=false;});container.appendChild(item);});
       }
     }
+    let timerInterval;
+    function renderTimer(){const end=Number(localStorage.getItem('oabPhase2TimerEnd')||0);if(!end)return;const left=Math.max(0,end-Date.now());const seconds=Math.floor(left/1000);const h=String(Math.floor(seconds/3600)).padStart(2,'0');const m=String(Math.floor((seconds%3600)/60)).padStart(2,'0');const s=String(seconds%60).padStart(2,'0');document.querySelector('#exam-timer').textContent=`${h}:${m}:${s}`;if(left<=0){clearInterval(timerInterval);localStorage.removeItem('oabPhase2TimerEnd');}}
+    document.querySelector('#start-timer').addEventListener('click',()=>{localStorage.setItem('oabPhase2TimerEnd',String(Date.now()+5*60*60*1000));clearInterval(timerInterval);renderTimer();timerInterval=setInterval(renderTimer,1000);});
+    if(localStorage.getItem('oabPhase2TimerEnd')){renderTimer();timerInterval=setInterval(renderTimer,1000);}
+    async function loadPerformance(){const response=await fetch('/api/performance');if(!response.ok)return;const data=await response.json();const container=document.querySelector('#performance');if(!data.objective.length&&!data.discursive.length){container.textContent='Ainda não há tentativas registradas.';return;}container.innerHTML='';data.objective.forEach(item=>{const row=document.createElement('div');row.className='lesson';row.innerHTML=`<strong>${item.subject}</strong><span>Objetivas: ${item.score}/${item.total} em ${item.attempts} tentativa(s).</span>`;container.appendChild(row);});data.discursive.forEach(item=>{const row=document.createElement('div');row.className='lesson';row.innerHTML=`<strong>${item.subject}</strong><span>Discursivas: ${item.score}/${item.max_score} pontos em ${item.attempts} resposta(s).</span>`;container.appendChild(row);});}
     document.querySelectorAll('.plans button').forEach(button => button.addEventListener('click', async () => {
       const days=Number(button.dataset.days); const response=await fetch('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({days})});
       if(response.ok){currentDays=days;await loadTasks();} else message.textContent='Não foi possível trocar o plano.';
     }));
     document.querySelector('#logout').addEventListener('click', async()=>{await fetch('/api/logout',{method:'POST'});window.location.href='/login.html';});
-    (async()=>{if(await loadMe()){await loadTasks();await loadSubjects();await loadCalendar();await loadReviews();}})();
+    (async()=>{if(await loadMe()){await loadTasks();await loadSubjects();await loadCalendar();await loadReviews();await loadPerformance();}})();
   </script>
 </body>
 </html>

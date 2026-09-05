@@ -117,6 +117,12 @@ def ensure_schema():
                     id BIGSERIAL PRIMARY KEY, subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
                     prompt TEXT NOT NULL, model_answer TEXT NOT NULL, source_note TEXT NOT NULL,
                     UNIQUE(subject_id, prompt))""",
+                """CREATE TABLE IF NOT EXISTS discursive_attempts (
+                    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                    question_id BIGINT NOT NULL REFERENCES discursive_questions(id) ON DELETE CASCADE,
+                    answer TEXT NOT NULL, score INTEGER NOT NULL, feedback TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
             ]
         else:
             statements = [
@@ -171,6 +177,11 @@ def ensure_schema():
                     id INTEGER PRIMARY KEY AUTOINCREMENT, subject_id INTEGER NOT NULL,
                     prompt TEXT NOT NULL, model_answer TEXT NOT NULL, source_note TEXT NOT NULL,
                     UNIQUE(subject_id, prompt))""",
+                """CREATE TABLE IF NOT EXISTS discursive_attempts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                    subject_id INTEGER NOT NULL, question_id INTEGER NOT NULL,
+                    answer TEXT NOT NULL, score INTEGER NOT NULL, feedback TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
             ]
         for statement in statements:
             execute(conn, statement)
@@ -736,6 +747,47 @@ def phase2_materials():
     finally:
         conn.close()
     return jsonify({"ok": True, "pieces": [{"id": r[0], "title": r[1], "scenario": r[2], "structure": r[3], "checklist": r[4], "source_note": r[5]} for r in pieces], "discursives": [{"id": r[0], "prompt": r[1], "model_answer": r[2], "source_note": r[3]} for r in discursives]})
+
+
+@app.post("/api/phase2/discursive/assess")
+def assess_discursive():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    payload = request.get_json(silent=True) or {}
+    subject_id = int(payload.get("subject_id", 0) or 0)
+    question_id = int(payload.get("question_id", 0) or 0)
+    answer = str(payload.get("answer", "")).strip()
+    criteria = payload.get("criteria", {})
+    if not subject_id or not question_id or len(answer) < 20 or not isinstance(criteria, dict):
+        return jsonify({"message": "Escreva uma resposta com pelo menos 20 caracteres e marque os critérios."}), 400
+    score = sum(2 for key in ("cabimento", "fundamento", "aplicacao", "conclusao", "clareza") if criteria.get(key))
+    feedback = "Boa estrutura inicial. Revise a fonte oficial e compare sua resposta com a orientação." if score >= 6 else "Volte ao enunciado, identifique o instituto, fundamente e conclua com pedido ou consequência jurídica."
+    conn = connection()
+    try:
+        execute(conn, "INSERT INTO discursive_attempts (user_id, subject_id, question_id, answer, score, feedback) VALUES (%s, %s, %s, %s, %s, %s)", (user_id, subject_id, question_id, answer, score, feedback))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "score": score, "max_score": 10, "feedback": feedback})
+
+
+@app.get("/api/performance")
+def performance():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    conn = connection()
+    try:
+        objective = fetch_all(conn, """SELECT s.name, COUNT(a.id), COALESCE(SUM(a.score), 0), COALESCE(SUM(a.total), 0)
+            FROM quiz_attempts a JOIN subjects s ON s.id = a.subject_id WHERE a.user_id = %s
+            GROUP BY s.name ORDER BY s.name""", (user_id,))
+        discursive = fetch_all(conn, """SELECT s.name, COUNT(d.id), COALESCE(SUM(d.score), 0)
+            FROM discursive_attempts d JOIN subjects s ON s.id = d.subject_id WHERE d.user_id = %s
+            GROUP BY s.name ORDER BY s.name""", (user_id,))
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "objective": [{"subject": r[0], "attempts": r[1], "score": r[2], "total": r[3]} for r in objective], "discursive": [{"subject": r[0], "attempts": r[1], "score": r[2], "max_score": r[1] * 10} for r in discursive]})
 
 
 @app.get("/api/calendar")
