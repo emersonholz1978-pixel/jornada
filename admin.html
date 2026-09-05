@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cadastros — OAB FÁCIL</title>
+  <style>
+    :root{font-family:Inter,Arial,sans-serif;color:#17233b;background:#f6f8fb}body{max-width:760px;margin:48px auto;padding:0 20px}main{background:#fff;border:1px solid #e5e9f0;border-radius:16px;padding:28px;box-shadow:0 10px 30px #17233b12}h1{margin-top:0}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}input{flex:1;min-width:240px;padding:12px;border:1px solid #ccd4e0;border-radius:8px}button{padding:12px 16px;border:0;border-radius:8px;background:#c49a48;color:#17233b;font-weight:700;cursor:pointer}#status{margin-top:18px}.muted{color:#667085;font-size:.92rem}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Cadastros do OAB FÁCIL</h1>
+    <p class="muted">Informe o token administrativo configurado no Render. Ele não é armazenado nesta página.</p>
+    <div class="row"><input id="token" type="password" placeholder="Token administrativo" autocomplete="off"><button id="load">Consultar</button></div>
+    <p id="status" role="status"></p>
+    <button id="download" hidden>Baixar CSV dos cadastros</button>
+  </main>
+  <script>
+    const token = document.querySelector('#token');
+    const status = document.querySelector('#status');
+    const download = document.querySelector('#download');
+    document.querySelector('#load').addEventListener('click', async () => {
+      status.textContent = 'Consultando…'; download.hidden = true;
+      try {
+        const response = await fetch('/api/admin/resumo', {headers: {'X-Admin-Token': token.value}});
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Não foi possível consultar.');
+        status.textContent = `Total de cadastros: ${data.total}`;
+        download.hidden = false;
+      } catch (error) { status.textContent = error.message; }
+    });
+    download.addEventListener('click', async () => {
+      const response = await fetch('/api/admin/cadastros.csv', {headers: {'X-Admin-Token': token.value}});
+      if (!response.ok) { status.textContent = 'Não foi possível baixar os cadastros.'; return; }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob); const link = document.createElement('a');
+      link.href = url; link.download = 'oab-facil-cadastros.csv'; link.click(); URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
