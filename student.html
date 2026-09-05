@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Área do aluno — OAB FÁCIL</title>
   <style>
-    :root{font-family:Inter,Arial,sans-serif;color:#17233b;background:#f6f8fb}body{margin:0}.top{background:#17233b;color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{font-weight:800;letter-spacing:.08em}.top button{border:1px solid #c49a48;background:transparent;color:#fff;padding:9px 13px;border-radius:7px;cursor:pointer}.wrap{max-width:1040px;margin:32px auto;padding:0 20px}.eyebrow{color:#a67c2e;font-weight:700}.hero{display:flex;justify-content:space-between;gap:24px;align-items:end;flex-wrap:wrap}.hero h1{margin:0 0 8px}.grid{display:grid;grid-template-columns:1fr 1.4fr;gap:20px;margin-top:28px}.card{background:#fff;border:1px solid #e5e9f0;border-radius:14px;padding:22px;box-shadow:0 8px 24px #17233b0c}.progress{height:10px;background:#e8edf4;border-radius:20px;overflow:hidden}.progress span{display:block;height:100%;background:#c49a48}.plans{display:flex;gap:8px;flex-wrap:wrap}.plans button{padding:10px 14px;border:1px solid #c49a48;background:#fff;border-radius:8px;cursor:pointer;color:#17233b}.plans button.active{background:#c49a48;font-weight:700}.task{display:flex;gap:12px;align-items:flex-start;border-top:1px solid #edf0f4;padding:14px 0}.task:first-child{border-top:0}.task input{margin-top:4px;width:18px;height:18px;accent-color:#a67c2e}.task strong{display:block}.muted{color:#667085}.error{color:#a33}.stats{display:flex;gap:22px;flex-wrap:wrap;margin-top:18px}.stats strong{font-size:1.4rem;display:block}.empty{padding:18px 0}.content-card{margin-top:20px}.lesson{border-top:1px solid #edf0f4;padding:12px 0}.lesson strong{display:block}.links a{color:#9a7328;margin-right:14px}
+    :root{font-family:Inter,Arial,sans-serif;color:#17233b;background:#f6f8fb}body{margin:0}.top{background:#17233b;color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{font-weight:800;letter-spacing:.08em}.top button{border:1px solid #c49a48;background:transparent;color:#fff;padding:9px 13px;border-radius:7px;cursor:pointer}.wrap{max-width:1040px;margin:32px auto;padding:0 20px}.eyebrow{color:#a67c2e;font-weight:700}.hero{display:flex;justify-content:space-between;gap:24px;align-items:end;flex-wrap:wrap}.hero h1{margin:0 0 8px}.grid{display:grid;grid-template-columns:1fr 1.4fr;gap:20px;margin-top:28px}.card{background:#fff;border:1px solid #e5e9f0;border-radius:14px;padding:22px;box-shadow:0 8px 24px #17233b0c}.progress{height:10px;background:#e8edf4;border-radius:20px;overflow:hidden}.progress span{display:block;height:100%;background:#c49a48}.plans{display:flex;gap:8px;flex-wrap:wrap}.plans button{padding:10px 14px;border:1px solid #c49a48;background:#fff;border-radius:8px;cursor:pointer;color:#17233b}.plans button.active{background:#c49a48;font-weight:700}.task{display:flex;gap:12px;align-items:flex-start;border-top:1px solid #edf0f4;padding:14px 0}.task:first-child{border-top:0}.task input{margin-top:4px;width:18px;height:18px;accent-color:#a67c2e}.task strong{display:block}.muted{color:#667085}.error{color:#a33}.stats{display:flex;gap:22px;flex-wrap:wrap;margin-top:18px}.stats strong{font-size:1.4rem;display:block}.empty{padding:18px 0}.content-card{margin-top:20px}.lesson{border-top:1px solid #edf0f4;padding:12px 0}.lesson strong{display:block}.quiz-start,.quiz-submit{padding:10px 14px;border:1px solid #c49a48;background:#c49a48;border-radius:8px;cursor:pointer;color:#17233b;font-weight:700}.quiz-area{margin-top:18px}.quiz-question{border-top:1px solid #edf0f4;padding:16px 0}.quiz-question p{font-weight:700}.quiz-option{display:block;padding:7px 0;font-weight:400}.quiz-result{background:#f8f3e8;border-radius:10px;padding:14px;margin-top:16px}.quiz-result article{border-top:1px solid #e4d8bd;padding:10px 0}.quiz-result small{display:block}.links a{color:#9a7328;margin-right:14px}
     @media(max-width:760px){.grid{grid-template-columns:1fr}.top{padding:16px}.wrap{margin-top:22px}}
   </style>
 </head>
@@ -27,6 +27,12 @@
       <p class="muted">A matriz prioriza Ética e Estatuto e organiza as demais disciplinas conforme a distribuição de referência da 1ª fase.</p>
       <div id="subjects" class="plans"></div>
       <div id="lessons" class="empty muted">Selecione uma disciplina para ver os conteúdos.</div>
+    </section>
+    <section class="card content-card">
+      <h2>Bloco autoral de Ética</h2>
+      <p class="muted">Responda às questões e veja a correção comentada ao final.</p>
+      <button id="start-quiz" class="quiz-start">Iniciar bloco de questões</button>
+      <div id="quiz" class="quiz-area"></div>
     </section>
   </main>
   <script>
@@ -64,6 +70,26 @@
         tasks.appendChild(row);
       });
     }
+    async function startQuiz(){
+      const response = await fetch('/api/quiz');
+      if(!response.ok) return;
+      const data = await response.json(); const container=document.querySelector('#quiz'); container.innerHTML='';
+      data.questions.forEach((question, index)=>{
+        const block=document.createElement('article'); block.className='quiz-question';
+        const options=question.options.map((option, optionIndex)=>`<label class="quiz-option"><input type="radio" name="q-${question.id}" value="${optionIndex}"> ${String.fromCharCode(65+optionIndex)}) ${option}</label>`).join('');
+        block.innerHTML=`<p>${index+1}. ${question.prompt}</p>${options}`; container.appendChild(block);
+      });
+      const submit=document.createElement('button'); submit.className='quiz-submit'; submit.textContent='Corrigir bloco'; submit.addEventListener('click',async()=>{
+        const answers={}; data.questions.forEach(question=>{const selected=document.querySelector(`input[name="q-${question.id}"]:checked`);if(selected) answers[question.id]=Number(selected.value);});
+        submit.disabled=true; const result=await fetch('/api/quiz/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject_id:data.subject_id,answers})});
+        if(!result.ok){submit.disabled=false;return;} const correction=await result.json();
+        const output=document.createElement('div'); output.className='quiz-result'; output.innerHTML=`<strong>Resultado: ${correction.score}/${correction.total}</strong>`;
+        correction.corrections.forEach((item,index)=>{const article=document.createElement('article');article.innerHTML=`<strong>${index+1}. ${item.correct?'✓ Acerto':'✗ Revise este tema'}</strong><small>${item.explanation}</small>`;output.appendChild(article);}); container.appendChild(output); submit.remove();
+      });
+      container.appendChild(submit);
+    }
+    document.querySelector('#start-quiz').addEventListener('click', startQuiz);
+
     async function loadSubjects(){
       const response = await fetch('/api/subjects');
       if(!response.ok) return;

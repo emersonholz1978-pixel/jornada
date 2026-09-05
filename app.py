@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import os
 import re
 import sqlite3
@@ -89,6 +90,15 @@ def ensure_schema():
                     title VARCHAR(180) NOT NULL, summary TEXT NOT NULL,
                     source_note TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(subject_id, title))""",
+                """CREATE TABLE IF NOT EXISTS questions (
+                    id BIGSERIAL PRIMARY KEY, subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                    prompt TEXT NOT NULL, options_json TEXT NOT NULL, answer_index INTEGER NOT NULL,
+                    explanation TEXT NOT NULL, source_note TEXT NOT NULL)""",
+                """CREATE TABLE IF NOT EXISTS quiz_attempts (
+                    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                    score INTEGER NOT NULL, total INTEGER NOT NULL, answers_json TEXT NOT NULL,
+                    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
             ]
         else:
             statements = [
@@ -118,6 +128,14 @@ def ensure_schema():
                     title TEXT NOT NULL, summary TEXT NOT NULL,
                     source_note TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(subject_id, title))""",
+                """CREATE TABLE IF NOT EXISTS questions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, subject_id INTEGER NOT NULL,
+                    prompt TEXT NOT NULL, options_json TEXT NOT NULL, answer_index INTEGER NOT NULL,
+                    explanation TEXT NOT NULL, source_note TEXT NOT NULL)""",
+                """CREATE TABLE IF NOT EXISTS quiz_attempts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                    subject_id INTEGER NOT NULL, score INTEGER NOT NULL, total INTEGER NOT NULL,
+                    answers_json TEXT NOT NULL, completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
             ]
         for statement in statements:
             execute(conn, statement)
@@ -165,6 +183,23 @@ def ensure_schema():
                 cur.executemany("INSERT INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING", lesson_rows)
         else:
             conn.executemany("INSERT OR IGNORE INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (?, ?, ?, ?, ?)", lesson_rows)
+        question_rows = [
+            (ethics, "Na publicidade profissional da advocacia, a conduta adequada é:", json.dumps(["Prometer resultado para atrair clientes.", "Divulgar informação objetiva e discreta, sem captação indevida.", "Comparar diretamente seus serviços com os de outro advogado.", "Distribuir publicidade em qualquer formato sem limites."]), 1, "A publicidade profissional deve ser informativa, discreta e compatível com a ética, sem promessa de resultado ou captação indevida.", "Questão autoral OAB FÁCIL; confira a regulamentação vigente antes da publicação definitiva."),
+            (ethics, "Sobre o sigilo profissional, é correto afirmar que:", json.dumps(["É opcional quando o cliente não assina contrato.", "Só existe durante o processo judicial.", "É dever profissional e pode ter exceções justificadas previstas na regulamentação.", "Pode ser afastado sempre que houver interesse comercial."]), 2, "O sigilo é um dever profissional amplo; suas exceções devem ser justificadas e observadas conforme a legislação e a regulamentação vigente.", "Questão autoral OAB FÁCIL; confira o texto oficial vigente."),
+            (ethics, "A incompatibilidade para o exercício da advocacia significa, em regra:", json.dumps(["Proibição total do exercício da advocacia.", "Apenas uma limitação territorial.", "Uma recomendação sem consequência profissional.", "Suspensão automática por trinta dias."]), 0, "A incompatibilidade representa proibição total, enquanto o impedimento é uma limitação parcial ao exercício da advocacia.", "Questão autoral OAB FÁCIL; confira o Estatuto vigente."),
+            (ethics, "Conforme a regra geral sobre honorários de sucumbência:", json.dumps(["Pertencem sempre à parte vencedora.", "Não podem ser cobrados em nenhuma hipótese.", "Constituem direito do advogado, conforme a legislação aplicável.", "Pertencem automaticamente ao tribunal."]), 2, "Os honorários de sucumbência constituem direito do advogado, observados os requisitos e a disciplina legal aplicável.", "Questão autoral OAB FÁCIL; confira o Estatuto vigente."),
+            (ethics, "Entre as sanções disciplinares previstas no Estatuto da Advocacia está:", json.dumps(["Censura.", "Advertência escolar.", "Interdição civil automática.", "Perda de nacionalidade."]), 0, "Censura, suspensão, exclusão e multa integram o conjunto de sanções disciplinares previsto no Estatuto, conforme o caso.", "Questão autoral OAB FÁCIL; confira o texto oficial vigente."),
+            (ethics, "Prerrogativa profissional deve ser entendida como:", json.dumps(["Privilégio pessoal sem relação com a profissão.", "Garantia necessária ao exercício da advocacia, dentro dos limites legais.", "Autorização para descumprir decisões judiciais.", "Imunidade para qualquer conduta."]), 1, "Prerrogativas são garantias funcionais para o exercício independente da advocacia; não são autorização para descumprir a lei.", "Questão autoral OAB FÁCIL; confira o Estatuto vigente."),
+            (ethics, "O impedimento profissional, em comparação com a incompatibilidade, é normalmente:", json.dumps(["Uma proibição parcial em situações determinadas.", "Uma proibição total em qualquer atividade.", "Uma sanção criminal.", "Uma forma de inscrição provisória."]), 0, "O impedimento limita o exercício em determinadas situações; a incompatibilidade tem alcance total enquanto durar a causa.", "Questão autoral OAB FÁCIL; confira o Estatuto vigente."),
+            (ethics, "Ao revisar o Código de Ética, uma boa prática de estudo é:", json.dumps(["Memorizar frases isoladas sem conferir a fonte.", "Ignorar alterações normativas.", "Relacionar deveres, condutas, consequências e a fonte oficial vigente.", "Usar apenas resumos antigos."]), 2, "A revisão deve conectar deveres, condutas e consequências, sempre conferindo a legislação e a regulamentação atualizadas.", "Questão autoral OAB FÁCIL; material de estudo, não substitui a fonte oficial."),
+        ]
+        existing_questions = fetch_one(conn, "SELECT COUNT(*) FROM questions WHERE subject_id = %s", (ethics,))[0]
+        if existing_questions == 0:
+            if is_postgres():
+                with conn.cursor() as cur:
+                    cur.executemany("INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (%s, %s, %s, %s, %s, %s)", question_rows)
+            else:
+                conn.executemany("INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (?, ?, ?, ?, ?, ?)", question_rows)
 
         for days in (30, 60, 90):
             existing = fetch_one(conn, "SELECT COUNT(*) FROM study_tasks WHERE plan_days = %s", (days,))[0]
@@ -376,6 +411,63 @@ def lessons():
     finally:
         conn.close()
     return jsonify({"ok": True, "lessons": [{"id": r[0], "title": r[1], "summary": r[2], "source_note": r[3]} for r in rows]})
+
+
+@app.get("/api/quiz")
+def quiz():
+    if not logged_user_id():
+        return jsonify({"message": "Faça login para continuar."}), 401
+    subject_id = request.args.get("subject", type=int)
+    if not subject_id:
+        lookup = connection()
+        try:
+            subject_id = fetch_one(lookup, "SELECT id FROM subjects WHERE name = %s", ("Ética e Estatuto da OAB",))[0]
+        finally:
+            lookup.close()
+    conn = connection()
+    try:
+        rows = fetch_all(conn, "SELECT id, prompt, options_json FROM questions WHERE subject_id = %s ORDER BY id", (subject_id,))
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "subject_id": subject_id, "questions": [{"id": r[0], "prompt": r[1], "options": json.loads(r[2])} for r in rows]})
+
+
+@app.post("/api/quiz/submit")
+def submit_quiz():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    payload = request.get_json(silent=True) or {}
+    subject_id = int(payload.get("subject_id", 0))
+    raw_answers = payload.get("answers", {})
+    if not subject_id or not isinstance(raw_answers, dict):
+        return jsonify({"message": "Envie as respostas do bloco."}), 400
+    conn = connection()
+    try:
+        rows = fetch_all(conn, "SELECT id, prompt, options_json, answer_index, explanation FROM questions WHERE subject_id = %s ORDER BY id", (subject_id,))
+        if not rows:
+            return jsonify({"message": "Este bloco ainda não possui questões."}), 404
+        corrections = []
+        score = 0
+        for row in rows:
+            selected = raw_answers.get(str(row[0]))
+            try:
+                selected_int = int(selected) if selected is not None else None
+            except (TypeError, ValueError):
+                selected_int = None
+            correct = selected_int == row[3]
+            if correct:
+                score += 1
+            corrections.append({"id": row[0], "prompt": row[1], "selected": selected_int, "correct_answer": row[3], "correct": correct, "explanation": row[4]})
+        if is_postgres():
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO quiz_attempts (user_id, subject_id, score, total, answers_json) VALUES (%s, %s, %s, %s, %s)", (user_id, subject_id, score, len(rows), json.dumps(raw_answers)))
+        else:
+            conn.execute("INSERT INTO quiz_attempts (user_id, subject_id, score, total, answers_json) VALUES (?, ?, ?, ?, ?)", (user_id, subject_id, score, len(rows), json.dumps(raw_answers)))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "score": score, "total": len(rows), "corrections": corrections})
 
 
 @app.post("/api/tasks/<int:task_id>/complete")
