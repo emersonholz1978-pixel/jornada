@@ -540,15 +540,23 @@ def ensure_schema():
             (social_security, "O custeio da seguridade social envolve:", json.dumps(["Fontes e contribuições previstas na Constituição e na lei.", "Somente doações privadas.", "Apenas multas criminais.", "Nenhuma fonte pública."]), 0, "O sistema possui fontes de custeio constitucional e legalmente previstas.", "Questão autoral OAB FÁCIL; confira a Constituição e a legislação vigente."),
             (social_security, "A revisão previdenciária deve priorizar:", json.dumps(["Legislação atualizada e requisitos específicos de cada benefício.", "Resumos sem data.", "Somente notícias.", "Nenhuma fonte oficial."]), 0, "A legislação previdenciária exige conferência de alterações e dos requisitos do caso.", "Questão autoral OAB FÁCIL; material de estudo, não substitui a fonte oficial."),
         ]
+        extra_source = "Questão autoral OAB FÁCIL; confira a legislação e a fonte oficial vigentes."
+        civil_questions += [(civil, "Na responsabilidade pelo fato do produto, a análise deve considerar:", json.dumps(["O regime legal aplicável e os requisitos do defeito e do dano.", "Somente a vontade do consumidor.", "A inexistência de nexo causal em qualquer hipótese.", "Apenas o preço do produto."]), 0, "A responsabilidade deve ser analisada conforme o regime legal aplicável, defeito, dano e nexo.", extra_source), (civil, "A prescrição e a decadência distinguem-se porque:", json.dumps(["Possuem natureza e efeitos próprios, que devem ser examinados conforme a pretensão e a lei.", "São sempre sinônimos.", "Nunca dependem de prazo legal.", "Somente existem no Direito Penal."]), 0, "Prescrição e decadência têm regimes distintos e exigem análise do direito envolvido e da legislação.", extra_source)]
+        process_civil_questions += [(process_civil, "A tutela provisória pode ser estudada a partir de:", json.dumps(["Urgência ou evidência, conforme os requisitos legais.", "Apenas sentença transitada em julgado.", "Somente acordo extrajudicial.", "Nenhuma fundamentação."]), 0, "O CPC disciplina tutelas de urgência e de evidência com requisitos próprios.", extra_source), (process_civil, "O contraditório no processo civil deve ser compreendido como:", json.dumps(["Participação e possibilidade de influência das partes, ressalvadas hipóteses legais.", "Direito exclusivo do juiz.", "Dispensa de ciência dos atos.", "Proibição de produção de prova."]), 0, "O contraditório envolve ciência, participação e possibilidade de influência nos limites legais.", extra_source)]
+        constitutional_questions += [(constitutional, "O controle de constitucionalidade examina:", json.dumps(["Compatibilidade de atos normativos com a Constituição, conforme o modelo aplicável.", "Somente contratos privados.", "Apenas fatos sem norma.", "A conveniência administrativa sem parâmetros."]), 0, "O controle verifica compatibilidade constitucional segundo as vias e competências previstas.", extra_source), (constitutional, "A federação brasileira pressupõe:", json.dumps(["Repartição constitucional de competências e autonomia dos entes federados.", "Subordinação absoluta dos municípios a particulares.", "Ausência de Constituição.", "Competência única da União para todo assunto."]), 0, "A federação organiza autonomia e repartição de competências nos termos constitucionais.", extra_source)]
+        penal_questions += [(penal, "A tentativa é analisada quando:", json.dumps(["A execução começa, mas o crime não se consuma por circunstâncias alheias à vontade do agente, conforme a lei.", "Há apenas pensamento sem ato executório.", "O resultado ocorre integralmente.", "Não existe início de execução."]), 0, "A tentativa exige início da execução e não consumação por circunstâncias alheias à vontade, observadas as regras legais.", extra_source), (penal, "A legítima defesa exige, em linhas gerais:", json.dumps(["Agressão injusta atual ou iminente e uso moderado dos meios necessários.", "Qualquer vingança posterior.", "Agressão já encerrada em todos os casos.", "Ausência de perigo ou agressão."]), 0, "A excludente deve ser analisada pelos requisitos legais de agressão e reação moderada.", extra_source)]
+        process_penal_questions += [(process_penal, "A prisão cautelar deve ser examinada:", json.dumps(["À luz dos requisitos legais, da necessidade e da fundamentação concreta.", "Como antecipação automática da pena.", "Sem decisão fundamentada.", "Independentemente de qualquer hipótese legal."]), 0, "Medidas cautelares exigem requisitos e fundamentação, não equivalendo automaticamente à pena.", extra_source), (process_penal, "O devido processo penal envolve:", json.dumps(["Garantias como juiz competente, defesa, contraditório e limites probatórios.", "Ausência de defesa.", "Punição sem acusação.", "Dispensa de fundamentação."]), 0, "O devido processo reúne garantias constitucionais e legais de julgamento válido.", extra_source)]
+        administrative_questions += [(administrative, "A anulação de ato administrativo relaciona-se, em regra, à:", json.dumps(["Ilegalidade do ato, observados competência e procedimento aplicáveis.", "Conveniência de ato sempre válido.", "Vontade particular sem fundamento.", "Ausência de controle."]), 0, "A anulação se liga à ilegalidade; a revogação, em linhas gerais, à conveniência e oportunidade dentro dos limites legais.", extra_source)]
+        labour_questions += [(labour, "A alteração contratual trabalhista deve ser analisada considerando:", json.dumps(["Os limites legais e a proteção contra alteração lesiva, conforme o caso.", "A liberdade irrestrita do empregador.", "A inexistência de contrato.", "Somente a vontade de terceiros."]), 0, "Alterações contratuais estão sujeitas aos limites da legislação e à proteção do trabalhador.", extra_source)]
+        labour_process_questions += [(labour_process, "O ônus da prova no processo do trabalho deve ser examinado conforme:", json.dumps(["As regras legais, a distribuição aplicável e as circunstâncias do caso.", "Uma regra fixa sem exceções.", "A vontade da testemunha.", "A ausência de alegações."]), 0, "A distribuição do ônus da prova depende da legislação e da análise do caso concreto.", extra_source)]
+        tax_questions += [(tax, "A obrigação tributária principal tem por objeto:", json.dumps(["O pagamento de tributo ou penalidade pecuniária, conforme a lei.", "A prestação de serviço privado.", "Apenas uma recomendação.", "A criação de sentença."]), 0, "O CTN disciplina a obrigação principal e seu objeto nos termos legais.", extra_source)]
         question_groups = {ethics: question_rows, civil: civil_questions, constitutional: constitutional_questions, process_civil: process_civil_questions, penal: penal_questions, administrative: administrative_questions, labour: labour_questions, tax: tax_questions, business: business_questions, process_penal: process_penal_questions, labour_process: labour_process_questions, human_rights: human_rights_questions, consumer: consumer_questions, eca: eca_questions, environmental: environmental_questions, international: international_questions, philosophy: philosophy_questions, electoral: electoral_questions, financial: financial_questions, social_security: social_security_questions}
         for subject_id, rows_to_seed in question_groups.items():
-            existing_questions = fetch_one(conn, "SELECT COUNT(*) FROM questions WHERE subject_id = %s", (subject_id,))[0]
-            if existing_questions == 0:
-                if is_postgres():
-                    with conn.cursor() as cur:
-                        cur.executemany("INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (%s, %s, %s, %s, %s, %s)", rows_to_seed)
-                else:
-                    conn.executemany("INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (?, ?, ?, ?, ?, ?)", rows_to_seed)
+            for question_row in rows_to_seed:
+                exists = fetch_one(conn, "SELECT id FROM questions WHERE subject_id = %s AND prompt = %s", (question_row[0], question_row[1]))
+                if exists:
+                    continue
+                execute(conn, "INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (%s, %s, %s, %s, %s, %s)", question_row)
 
         practical_rows = [
             (phase2_admin, "Mandado de segurança administrativo", "Ato ilegal de autoridade pública com prova pré-constituída.", "Endereçamento; partes; cabimento; fatos; direito; liminar; pedidos; fechamento.", "Autoridade coatora; prazo; prova; fundamento constitucional; pedido liminar.", "Material autoral OAB FÁCIL; confira o edital e a legislação vigente."),
@@ -1017,12 +1025,27 @@ def general_mock_exam():
         return jsonify({"message": "Faça login para continuar."}), 401
     conn = connection()
     try:
-        rows = fetch_all(conn, """SELECT q.id, q.prompt, q.options_json, q.subject_id, s.name
+        rows = fetch_all(conn, """SELECT q.id, q.prompt, q.options_json, q.subject_id, s.name, s.question_weight, s.sort_order
             FROM questions q JOIN subjects s ON s.id = q.subject_id
-            WHERE s.phase = %s ORDER BY s.sort_order, q.id LIMIT 80""", ("1ª fase",))
+            WHERE s.phase = %s ORDER BY s.sort_order, q.id""", ("1ª fase",))
     finally:
         conn.close()
-    return jsonify({"ok": True, "total": len(rows), "questions": [{"id": r[0], "prompt": r[1], "options": json.loads(r[2]), "subject_id": r[3], "subject_name": r[4]} for r in rows]})
+    grouped = {}
+    targets = {}
+    names = {}
+    for row in rows:
+        grouped.setdefault(row[3], []).append(row)
+        targets[row[3]] = row[5]
+        names[row[3]] = row[4]
+    selected = []
+    distribution = []
+    for subject_id, subject_rows in grouped.items():
+        target = targets[subject_id]
+        chosen = subject_rows[:target]
+        selected.extend(chosen)
+        distribution.append({"subject_id": subject_id, "subject": names[subject_id], "target": target, "selected": len(chosen), "available": len(subject_rows)})
+    selected.sort(key=lambda row: (row[6], row[0]))
+    return jsonify({"ok": True, "total": len(selected), "target_total": sum(item["target"] for item in distribution), "distribution": distribution, "questions": [{"id": r[0], "prompt": r[1], "options": json.loads(r[2]), "subject_id": r[3], "subject_name": r[4]} for r in selected]})
 
 
 @app.post("/api/simulado/submit")
