@@ -7,6 +7,8 @@ import sqlite3
 import secrets
 import hashlib
 import smtplib
+import time
+from collections import defaultdict, deque
 from email.message import EmailMessage
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
@@ -25,6 +27,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 MAIL_FROM = os.getenv("MAIL_FROM", SMTP_USER).strip()
+RATE_BUCKETS = defaultdict(deque)
 
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
 app.secret_key = SESSION_SECRET
@@ -85,6 +88,21 @@ def send_reset_email(email, token):
             smtp.login(SMTP_USER, SMTP_PASSWORD)
         smtp.send_message(message)
     return True
+
+
+def limited(bucket, limit, window_seconds):
+    now = time.monotonic()
+    events = RATE_BUCKETS[bucket]
+    while events and now - events[0] >= window_seconds:
+        events.popleft()
+    if len(events) >= limit:
+        return True
+    events.append(now)
+    return False
+
+
+def client_key(prefix):
+    return f"{prefix}:{request.remote_addr or 'unknown'}"
 
 
 def ensure_schema():
@@ -613,6 +631,17 @@ def prepare_database():
         ensure_schema()
 
 
+@app.after_request
+def security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if request.is_secure:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
+
 @app.get("/")
 def home():
     return send_from_directory(BASE_DIR, "index.html")
@@ -635,6 +664,8 @@ def static_file(filename):
 
 @app.post("/api/cadastros")
 def register_student():
+    if limited(client_key("register"), 5, 3600):
+        return jsonify({"ok": False, "message": "Muitas tentativas de cadastro. Tente novamente mais tarde."}), 429
     payload = request.get_json(silent=True) or request.form
     name = str(payload.get("name", "")).strip()
     email = str(payload.get("email", "")).strip().lower()
@@ -676,6 +707,8 @@ def register_student():
 
 @app.post("/api/login")
 def login():
+    if limited(client_key("login"), 8, 900):
+        return jsonify({"ok": False, "message": "Muitas tentativas. Aguarde alguns minutos e tente novamente."}), 429
     payload = request.get_json(silent=True) or request.form
     email = str(payload.get("email", "")).strip().lower()
     password = str(payload.get("password", ""))
@@ -693,6 +726,8 @@ def login():
 
 @app.post("/api/password/forgot")
 def forgot_password():
+    if limited(client_key("forgot"), 3, 900):
+        return jsonify({"ok": True, "message": "Se o e-mail estiver cadastrado, enviaremos instruções de recuperação."})
     payload = request.get_json(silent=True) or request.form
     email = str(payload.get("email", "")).strip().lower()
     # A resposta é sempre genérica para não revelar quais e-mails têm conta.
@@ -719,6 +754,8 @@ def forgot_password():
 
 @app.post("/api/password/reset")
 def reset_password():
+    if limited(client_key("reset"), 5, 900):
+        return jsonify({"ok": False, "message": "Muitas tentativas de redefinição. Aguarde alguns minutos."}), 429
     payload = request.get_json(silent=True) or request.form
     raw_token = str(payload.get("token", "")).strip()
     new_password = str(payload.get("new_password", ""))
