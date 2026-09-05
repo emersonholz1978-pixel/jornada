@@ -123,6 +123,12 @@ def ensure_schema():
                     id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     token_hash VARCHAR(128) NOT NULL UNIQUE, expires_at TIMESTAMPTZ NOT NULL,
                     used_at TIMESTAMPTZ NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+                """CREATE TABLE IF NOT EXISTS phase2_mock_attempts (
+                    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                    piece_id BIGINT NOT NULL,
+                    answers_json TEXT NOT NULL, score INTEGER NOT NULL, max_score INTEGER NOT NULL,
+                    duration_seconds INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
                 """CREATE TABLE IF NOT EXISTS study_tasks (
                     id BIGSERIAL PRIMARY KEY, plan_days INTEGER NOT NULL,
                     day_number INTEGER NOT NULL, title VARCHAR(180) NOT NULL,
@@ -190,6 +196,11 @@ def ensure_schema():
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
                     token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL,
                     used_at TEXT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE IF NOT EXISTS phase2_mock_attempts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                    subject_id INTEGER NOT NULL, piece_id INTEGER NOT NULL,
+                    answers_json TEXT NOT NULL, score INTEGER NOT NULL, max_score INTEGER NOT NULL,
+                    duration_seconds INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
                 """CREATE TABLE IF NOT EXISTS study_tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, plan_days INTEGER NOT NULL,
                     day_number INTEGER NOT NULL, title TEXT NOT NULL,
@@ -912,6 +923,56 @@ def lessons():
     return jsonify({"ok": True, "lessons": [{"id": r[0], "title": r[1], "summary": r[2], "source_note": r[3]} for r in rows]})
 
 
+@app.get("/api/phase2/mock")
+def phase2_mock():
+    if not logged_user_id():
+        return jsonify({"message": "Faça login para continuar."}), 401
+    subject_id = request.args.get("subject", type=int)
+    if not subject_id:
+        return jsonify({"message": "Informe a área da 2ª fase."}), 400
+    conn = connection()
+    try:
+        piece = fetch_one(conn, "SELECT id, title, scenario, structure, checklist, source_note FROM practical_pieces WHERE subject_id = %s ORDER BY id LIMIT 1", (subject_id,))
+        questions = fetch_all(conn, "SELECT id, prompt, source_note FROM discursive_questions WHERE subject_id = %s ORDER BY id LIMIT 4", (subject_id,))
+    finally:
+        conn.close()
+    if not piece or len(questions) < 4:
+        return jsonify({"message": "Esta área ainda não possui material suficiente para o simulado."}), 409
+    return jsonify({"ok": True, "subject_id": subject_id, "piece": {"id": piece[0], "title": piece[1], "scenario": piece[2], "structure": piece[3], "checklist": piece[4], "source_note": piece[5]}, "questions": [{"id": row[0], "prompt": row[1], "source_note": row[2]} for row in questions]})
+
+
+@app.post("/api/phase2/mock/submit")
+def submit_phase2_mock():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    payload = request.get_json(silent=True) or {}
+    subject_id = int(payload.get("subject_id", 0) or 0)
+    piece_id = int(payload.get("piece_id", 0) or 0)
+    piece = payload.get("piece", {})
+    answers = payload.get("answers", [])
+    duration = max(0, int(payload.get("duration_seconds", 0) or 0))
+    if not subject_id or not piece_id or not isinstance(piece, dict) or not isinstance(answers, list) or len(answers) != 4:
+        return jsonify({"message": "Envie a peça e as quatro respostas do simulado."}), 400
+    piece_criteria = piece.get("criteria", {})
+    if not isinstance(piece_criteria, dict):
+        return jsonify({"message": "Critérios da peça inválidos."}), 400
+    score = min(10, sum(2 for key in ("cabimento", "fundamento", "estrutura", "pedidos", "clareza") if piece_criteria.get(key)))
+    normalized = [{"question_id": int(item.get("question_id", 0) or 0), "answer": str(item.get("answer", "")).strip(), "criteria": item.get("criteria", {})} for item in answers if isinstance(item, dict)]
+    if len(normalized) != 4 or any(len(item["answer"]) < 20 or not isinstance(item["criteria"], dict) for item in normalized):
+        return jsonify({"message": "Cada resposta precisa ter pelo menos 20 caracteres e critérios marcados."}), 400
+    for item in normalized:
+        item["score"] = min(10, sum(2 for key in ("cabimento", "fundamento", "aplicacao", "conclusao", "clareza") if item["criteria"].get(key)))
+        score += item["score"]
+    conn = connection()
+    try:
+        execute(conn, "INSERT INTO phase2_mock_attempts (user_id, subject_id, piece_id, answers_json, score, max_score, duration_seconds) VALUES (%s, %s, %s, %s, %s, %s, %s)", (user_id, subject_id, piece_id, json.dumps({"piece": piece, "answers": normalized}), score, 50, duration))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "score": score, "max_score": 50, "feedback": "Resultado orientador salvo. Revise a peça, compare os fundamentos e confira a legislação e o edital vigentes."})
+
+
 @app.get("/api/phase2/materials")
 def phase2_materials():
     if not logged_user_id():
@@ -964,9 +1025,12 @@ def performance():
         discursive = fetch_all(conn, """SELECT s.name, COUNT(d.id), COALESCE(SUM(d.score), 0)
             FROM discursive_attempts d JOIN subjects s ON s.id = d.subject_id WHERE d.user_id = %s
             GROUP BY s.name ORDER BY s.name""", (user_id,))
+        phase2 = fetch_all(conn, """SELECT s.name, COUNT(m.id), COALESCE(SUM(m.score), 0), COALESCE(MAX(m.max_score), 50)
+            FROM phase2_mock_attempts m JOIN subjects s ON s.id = m.subject_id WHERE m.user_id = %s
+            GROUP BY s.name ORDER BY s.name""", (user_id,))
     finally:
         conn.close()
-    return jsonify({"ok": True, "objective": [{"subject": r[0], "attempts": r[1], "score": r[2], "total": r[3]} for r in objective], "discursive": [{"subject": r[0], "attempts": r[1], "score": r[2], "max_score": r[1] * 10} for r in discursive]})
+    return jsonify({"ok": True, "objective": [{"subject": r[0], "attempts": r[1], "score": r[2], "total": r[3]} for r in objective], "discursive": [{"subject": r[0], "attempts": r[1], "score": r[2], "max_score": r[1] * 10} for r in discursive], "phase2": [{"subject": r[0], "attempts": r[1], "score": r[2], "max_score": r[3]} for r in phase2]})
 
 
 @app.get("/api/calendar")
@@ -1307,9 +1371,12 @@ def admin_performance():
         discursive = fetch_all(conn, """SELECT u.name, u.email, s.name, COUNT(d.id), COALESCE(SUM(d.score), 0)
             FROM discursive_attempts d JOIN users u ON u.id = d.user_id JOIN subjects s ON s.id = d.subject_id
             GROUP BY u.name, u.email, s.name ORDER BY u.name, s.name""")
+        phase2 = fetch_all(conn, """SELECT u.name, u.email, s.name, COUNT(m.id), COALESCE(SUM(m.score), 0), COALESCE(MAX(m.max_score), 50)
+            FROM phase2_mock_attempts m JOIN users u ON u.id = m.user_id JOIN subjects s ON s.id = m.subject_id
+            GROUP BY u.name, u.email, s.name ORDER BY u.name, s.name""")
     finally:
         conn.close()
-    return jsonify({"ok": True, "objective": [{"name": r[0], "email": r[1], "subject": r[2], "attempts": r[3], "score": r[4], "total": r[5]} for r in rows], "discursive": [{"name": r[0], "email": r[1], "subject": r[2], "attempts": r[3], "score": r[4]} for r in discursive]})
+    return jsonify({"ok": True, "objective": [{"name": r[0], "email": r[1], "subject": r[2], "attempts": r[3], "score": r[4], "total": r[5]} for r in rows], "discursive": [{"name": r[0], "email": r[1], "subject": r[2], "attempts": r[3], "score": r[4]} for r in discursive], "phase2": [{"name": r[0], "email": r[1], "subject": r[2], "attempts": r[3], "score": r[4], "max_score": r[5]} for r in phase2]})
 
 
 @app.post("/api/admin/questions")
