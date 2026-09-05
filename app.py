@@ -1084,9 +1084,13 @@ def performance():
         phase2 = fetch_all(conn, """SELECT s.name, COUNT(m.id), COALESCE(SUM(m.score), 0), COALESCE(MAX(m.max_score), 50)
             FROM phase2_mock_attempts m JOIN subjects s ON s.id = m.subject_id WHERE m.user_id = %s
             GROUP BY s.name ORDER BY s.name""", (user_id,))
+        history_rows = fetch_all(conn, """SELECT s.name, m.score, m.max_score, m.duration_seconds, m.created_at
+            FROM phase2_mock_attempts m JOIN subjects s ON s.id = m.subject_id WHERE m.user_id = %s
+            ORDER BY m.created_at DESC LIMIT 20""", (user_id,))
     finally:
         conn.close()
-    return jsonify({"ok": True, "objective": [{"subject": r[0], "attempts": r[1], "score": r[2], "total": r[3]} for r in objective], "discursive": [{"subject": r[0], "attempts": r[1], "score": r[2], "max_score": r[1] * 10} for r in discursive], "phase2": [{"subject": r[0], "attempts": r[1], "score": r[2], "max_score": r[3]} for r in phase2]})
+    history = [{"subject": r[0], "score": r[1], "max_score": r[2], "duration_seconds": r[3], "created_at": r[4].isoformat() if hasattr(r[4], "isoformat") else str(r[4])} for r in history_rows]
+    return jsonify({"ok": True, "objective": [{"subject": r[0], "attempts": r[1], "score": r[2], "total": r[3]} for r in objective], "discursive": [{"subject": r[0], "attempts": r[1], "score": r[2], "max_score": r[1] * 10} for r in discursive], "phase2": [{"subject": r[0], "attempts": r[1], "score": r[2], "max_score": r[3]} for r in phase2], "history": history})
 
 
 @app.get("/api/calendar")
