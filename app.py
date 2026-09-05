@@ -961,6 +961,16 @@ def submit_phase2_mock():
     normalized = [{"question_id": int(item.get("question_id", 0) or 0), "answer": str(item.get("answer", "")).strip(), "criteria": item.get("criteria", {})} for item in answers if isinstance(item, dict)]
     if len(normalized) != 4 or any(len(item["answer"]) < 20 or not isinstance(item["criteria"], dict) for item in normalized):
         return jsonify({"message": "Cada resposta precisa ter pelo menos 20 caracteres e critérios marcados."}), 400
+    conn = connection()
+    try:
+        valid_piece = fetch_one(conn, "SELECT id FROM practical_pieces WHERE id = %s AND subject_id = %s", (piece_id, subject_id))
+        question_ids = [item["question_id"] for item in normalized]
+        placeholders = ",".join(["%s"] * len(question_ids))
+        valid_questions = fetch_all(conn, f"SELECT id FROM discursive_questions WHERE subject_id = %s AND id IN ({placeholders})", (subject_id,) + tuple(question_ids))
+    finally:
+        conn.close()
+    if len(set(question_ids)) != 4 or not valid_piece or {row[0] for row in valid_questions} != set(question_ids):
+        return jsonify({"message": "A peça ou as questões não pertencem à área selecionada."}), 400
     for item in normalized:
         item["score"] = min(10, sum(2 for key in ("cabimento", "fundamento", "aplicacao", "conclusao", "clareza") if item["criteria"].get(key)))
         score += item["score"]
@@ -970,7 +980,9 @@ def submit_phase2_mock():
         conn.commit()
     finally:
         conn.close()
-    return jsonify({"ok": True, "score": score, "max_score": 50, "feedback": "Resultado orientador salvo. Revise a peça, compare os fundamentos e confira a legislação e o edital vigentes."})
+    piece_keys = ("cabimento", "fundamento", "estrutura", "pedidos", "clareza")
+    answer_keys = ("cabimento", "fundamento", "aplicacao", "conclusao", "clareza")
+    return jsonify({"ok": True, "score": score, "max_score": 50, "feedback": "Resultado orientador salvo. Revise a peça, compare os fundamentos e confira a legislação e o edital vigentes.", "review": {"piece_missing": [key for key in piece_keys if not piece_criteria.get(key)], "answers": [{"question_id": item["question_id"], "score": item["score"], "missing": [key for key in answer_keys if not item["criteria"].get(key)]} for item in normalized]}})
 
 
 @app.get("/api/phase2/materials")
