@@ -1,0 +1,12 @@
+oab-facil/
+├── index.html
+├── Dockerfile
+├── README.md
+├── .gitignore
+└── assets/
+    ├── css/
+    │   └── styles.css
+    ├── js/
+    │   └── script.js
+    └── img/
+        └── (imagens futuras)
