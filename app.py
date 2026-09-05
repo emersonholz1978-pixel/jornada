@@ -614,6 +614,24 @@ def ensure_schema():
             (phase2_penal, "O que pode ser alegado na resposta à acusação?", "Podem ser apresentadas preliminares, argumentos de mérito, pedidos de absolvição sumária quando cabíveis e especificação das provas pretendidas.", "Material autoral OAB FÁCIL; confira o CPP vigente."),
             (phase2_tax, "Quais cuidados devem orientar um mandado de segurança tributário?", "A resposta deve verificar ato coator, direito líquido e certo, prova pré-constituída, autoridade competente, prazo e pedido liminar, sem transformar a ação em dilação probatória ampla.", "Material autoral OAB FÁCIL; confira a Constituição, o CTN e a legislação vigente."),
         ]
+        # O simulado discursivo completo usa quatro questões por área.
+        # Estas questões autorais complementam o catálogo inicial de duas por área.
+        discursive_rows += [
+            (phase2_admin, "Como se aplica o princípio da motivação aos atos administrativos?", "A resposta deve relacionar a indicação dos fatos e fundamentos jurídicos, a finalidade do ato, a possibilidade de controle e as exigências da legislação aplicável.", "Material autoral OAB FÁCIL; confira as fontes vigentes."),
+            (phase2_admin, "Quais são os limites do poder de polícia administrativa?", "Devem ser abordados competência, finalidade pública, legalidade, proporcionalidade, devido processo quando exigido e controle dos excessos.", "Material autoral OAB FÁCIL; confira as fontes vigentes."),
+            (phase2_civil, "O que deve ser observado na formação e na validade dos negócios jurídicos?", "A resposta deve examinar agente capaz, objeto lícito, possível e determinado ou determinável, forma exigida ou não proibida e eventuais vícios.", "Material autoral OAB FÁCIL; confira o Código Civil vigente."),
+            (phase2_civil, "Como deve ser analisada a responsabilidade civil por ato ilícito?", "A análise deve identificar conduta, dano, nexo causal, culpa quando exigida e eventuais excludentes, conforme o regime jurídico aplicável.", "Material autoral OAB FÁCIL; confira o Código Civil vigente."),
+            (phase2_constitutional, "Diferencie controle difuso e controle concentrado de constitucionalidade.", "A resposta deve indicar o modo de provocação, os órgãos competentes, o objeto e os efeitos conforme a Constituição e a legislação aplicável.", "Material autoral OAB FÁCIL; confira a Constituição vigente."),
+            (phase2_constitutional, "Quais garantias integram o devido processo legal?", "Devem ser relacionados juiz competente, contraditório, ampla defesa, fundamentação, duração razoável e demais garantias pertinentes ao caso.", "Material autoral OAB FÁCIL; confira a Constituição e a legislação vigente."),
+            (phase2_labour, "Quais elementos caracterizam a relação de emprego?", "A resposta deve examinar pessoa física, pessoalidade, não eventualidade, onerosidade e subordinação, sempre conforme os fatos e a legislação vigente.", "Material autoral OAB FÁCIL; confira a CLT vigente."),
+            (phase2_labour, "Como deve ser tratada a jornada de trabalho na solução de uma questão discursiva?", "É necessário identificar jornada contratual e efetiva, controle, limites legais, intervalos, horas extras e fatos relevantes para a conclusão.", "Material autoral OAB FÁCIL; confira a Constituição e a CLT vigentes."),
+            (phase2_business, "Quais requisitos gerais devem ser conferidos em um pedido de recuperação judicial?", "A resposta deve verificar legitimidade, exercício regular da atividade, documentação, requisitos temporais e demais exigências da legislação aplicável.", "Material autoral OAB FÁCIL; confira a legislação vigente."),
+            (phase2_business, "Como se distinguem empresário individual e sociedade empresária?", "A resposta deve abordar personalidade, organização da atividade, responsabilidade e registro, sem ignorar o regime jurídico específico do caso.", "Material autoral OAB FÁCIL; confira a legislação vigente."),
+            (phase2_penal, "Quais são os requisitos gerais da culpabilidade?", "A resposta deve examinar imputabilidade, potencial consciência da ilicitude e exigibilidade de conduta diversa, conforme o caso concreto e a lei penal.", "Material autoral OAB FÁCIL; confira o Código Penal vigente."),
+            (phase2_penal, "Como deve ser analisado o concurso de pessoas?", "Devem ser identificadas pluralidade de agentes, relevância causal e liame subjetivo, além da regra de responsabilização aplicável ao caso.", "Material autoral OAB FÁCIL; confira o Código Penal vigente."),
+            (phase2_tax, "Diferencie lançamento, crédito tributário e obrigação tributária.", "A resposta deve separar a relação jurídica tributária, a constituição do crédito pelo lançamento e os efeitos previstos no CTN.", "Material autoral OAB FÁCIL; confira a Constituição e o CTN vigentes."),
+            (phase2_tax, "Quais princípios limitam o poder de tributar?", "Devem ser analisados os princípios constitucionais pertinentes, como legalidade, anterioridade, isonomia e capacidade contributiva, conforme o tributo e a situação.", "Material autoral OAB FÁCIL; confira a Constituição e o CTN vigentes."),
+        ]
         if is_postgres():
             with conn.cursor() as cur:
                 cur.executemany("INSERT INTO practical_pieces (subject_id, title, scenario, structure, checklist, source_note) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING", practical_rows)
@@ -1112,7 +1130,7 @@ def calendar():
             else:
                 conn.executemany("INSERT INTO calendar_events (user_id, title, event_date, category) VALUES (?, ?, ?, ?)", [(u, t, d.isoformat(), c) for u, t, d, c in events])
             conn.commit()
-        rows = fetch_all(conn, "SELECT id, title, event_date, category, completed FROM calendar_events WHERE user_id = %s ORDER BY event_date, id")
+        rows = fetch_all(conn, "SELECT id, title, event_date, category, completed FROM calendar_events WHERE user_id = %s ORDER BY event_date, id", (user_id,))
     finally:
         conn.close()
     return jsonify({"ok": True, "events": [{"id": r[0], "title": r[1], "event_date": str(r[2]), "category": r[3], "completed": bool(r[4])} for r in rows]})
