@@ -654,6 +654,30 @@ def login():
     return jsonify({"ok": True, "message": "Login realizado."})
 
 
+@app.post("/api/account/password")
+def change_password():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"ok": False, "message": "Faça login para continuar."}), 401
+    payload = request.get_json(silent=True) or {}
+    current = str(payload.get("current_password", ""))
+    new_password = str(payload.get("new_password", ""))
+    if len(new_password) < 8:
+        return jsonify({"ok": False, "message": "A nova senha precisa ter pelo menos 8 caracteres."}), 400
+    conn = connection()
+    try:
+        row = fetch_one(conn, "SELECT password_hash FROM users WHERE id = %s", (user_id,))
+        if not row or not check_password_hash(row[0], current):
+            return jsonify({"ok": False, "message": "A senha atual não confere."}), 400
+        execute(conn, "UPDATE users SET password_hash = %s WHERE id = %s", (generate_password_hash(new_password), user_id))
+        conn.commit()
+    finally:
+        conn.close()
+    session.clear()
+    session["user_id"] = user_id
+    return jsonify({"ok": True, "message": "Senha atualizada com segurança."})
+
+
 @app.post("/api/logout")
 def logout():
     session.clear()

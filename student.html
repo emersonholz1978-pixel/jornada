@@ -53,6 +53,13 @@
       <p class="muted">Acompanhe tentativas objetivas e autoavaliações discursivas por disciplina.</p>
       <div id="performance" class="empty muted">Ainda não há tentativas registradas.</div>
     </section>
+    <section class="card content-card">
+      <h2>Segurança da conta</h2>
+      <p class="muted">Troque sua senha periodicamente. Ela nunca é exibida nem armazenada em texto aberto.</p>
+      <input id="current-password" type="password" autocomplete="current-password" placeholder="Senha atual">
+      <input id="new-password" type="password" autocomplete="new-password" placeholder="Nova senha (mínimo de 8 caracteres)">
+      <button id="change-password">Atualizar senha</button><span id="password-status" class="muted"></span>
+    </section>
     <section class="dashboard-grid content-card">
       <div class="card"><h2>Calendário</h2><p class="muted">Revisões e marcos do seu plano.</p><div id="calendar" class="empty muted">Carregando calendário…</div></div>
       <div class="card"><h2>Revisões pendentes</h2><p class="muted">Erros do simulado ficam guardados aqui.</p><div id="reviews" class="empty muted">Nenhuma revisão pendente.</div></div>
@@ -185,6 +192,7 @@
       const days=Number(button.dataset.days); const response=await fetch('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({days})});
       if(response.ok){currentDays=days;await loadTasks();} else message.textContent='Não foi possível trocar o plano.';
     }));
+    document.querySelector('#change-password').addEventListener('click',async()=>{const status=document.querySelector('#password-status');const response=await fetch('/api/account/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:document.querySelector('#current-password').value,new_password:document.querySelector('#new-password').value})});const data=await response.json();status.textContent=data.message||'Operação concluída.';if(response.ok){document.querySelector('#current-password').value='';document.querySelector('#new-password').value='';}});
     document.querySelector('#logout').addEventListener('click', async()=>{await fetch('/api/logout',{method:'POST'});window.location.href='/login.html';});
     (async()=>{if(await loadMe()){await loadTasks();await loadSubjects();await loadCalendar();await loadReviews();await loadPerformance();}})();
   </script>
