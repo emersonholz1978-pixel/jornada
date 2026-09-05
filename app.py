@@ -199,6 +199,8 @@ def ensure_schema():
         ]
         civil = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Direito Civil",))[0]
         constitutional = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Direito Constitucional",))[0]
+        process_civil = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Processo Civil",))[0]
+        penal = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Direito Penal",))[0]
         lesson_rows += [
             (civil, "Pessoas e personalidade", "Revise capacidade, direitos da personalidade e proteção jurídica da pessoa.", "Material autoral OAB FÁCIL; confira o Código Civil vigente.", 1),
             (civil, "Obrigações e responsabilidade civil", "Organize obrigação, dano, nexo causal e as hipóteses gerais de responsabilização.", "Material autoral OAB FÁCIL; confira o Código Civil vigente.", 2),
@@ -208,6 +210,14 @@ def ensure_schema():
             (constitutional, "Direitos e garantias fundamentais", "Organize direitos individuais, coletivos e instrumentos de proteção constitucional.", "Material autoral OAB FÁCIL; confira a Constituição vigente.", 2),
             (constitutional, "Organização dos Poderes", "Estude a separação funcional, controles e competências previstas na Constituição.", "Material autoral OAB FÁCIL; confira a Constituição vigente.", 3),
             (constitutional, "Controle de constitucionalidade", "Monte um quadro com noções de controle difuso, concentrado e efeitos das decisões.", "Material autoral OAB FÁCIL; confira a Constituição e a legislação vigente.", 4),
+            (process_civil, "Jurisdição e competência", "Revise jurisdição, competência e os critérios básicos para identificar o juízo adequado.", "Material autoral OAB FÁCIL; confira o CPC vigente.", 1),
+            (process_civil, "Atos processuais e prazos", "Organize atos, comunicações e contagem de prazos processuais.", "Material autoral OAB FÁCIL; confira o CPC vigente.", 2),
+            (process_civil, "Petição inicial e resposta", "Estude requisitos gerais da petição inicial, defesa e consequências processuais.", "Material autoral OAB FÁCIL; confira o CPC vigente.", 3),
+            (process_civil, "Recursos e revisão", "Monte um quadro com finalidade, cabimento e efeitos dos principais recursos.", "Material autoral OAB FÁCIL; confira o CPC vigente.", 4),
+            (penal, "Princípios do Direito Penal", "Revise legalidade, anterioridade, culpabilidade e limites da intervenção penal.", "Material autoral OAB FÁCIL; confira o Código Penal vigente.", 1),
+            (penal, "Tipicidade e elementos do crime", "Organize fato típico, ilicitude e culpabilidade como etapas de análise.", "Material autoral OAB FÁCIL; confira o Código Penal vigente.", 2),
+            (penal, "Concurso de pessoas", "Revise os conceitos gerais de autoria, participação e vínculo subjetivo.", "Material autoral OAB FÁCIL; confira o Código Penal vigente.", 3),
+            (penal, "Penas e aplicação", "Estude as noções gerais de espécies de pena e critérios de aplicação.", "Material autoral OAB FÁCIL; confira o Código Penal vigente.", 4),
         ]
         if is_postgres():
             with conn.cursor() as cur:
@@ -236,7 +246,19 @@ def ensure_schema():
             (constitutional, "As normas definidoras dos direitos e garantias fundamentais têm, pela Constituição, regra de:", json.dumps(["Aplicação imediata, observadas as condições constitucionais e legais.", "Aplicação somente após lei municipal.", "Aplicação proibida no setor privado.", "Revogação automática após um ano."]), 0, "A Constituição estabelece a regra da aplicação imediata dos direitos e garantias fundamentais, sem afastar a análise do caso concreto.", "Questão autoral OAB FÁCIL; confira a Constituição vigente."),
             (constitutional, "Na revisão constitucional, é importante conferir:", json.dumps(["Somente comentários antigos.", "O texto constitucional vigente, a jurisprudência e as leis relacionadas.", "Apenas notícias sem fonte.", "Somente modelos de petição."]), 1, "O estudo constitucional exige conferência do texto vigente e das fontes interpretativas pertinentes.", "Questão autoral OAB FÁCIL; material de estudo, não substitui a fonte oficial."),
         ]
-        question_groups = {ethics: question_rows, civil: civil_questions, constitutional: constitutional_questions}
+        process_civil_questions = [
+            (process_civil, "A competência no processo civil serve, em linhas gerais, para:", json.dumps(["Identificar o órgão jurisdicional adequado para a causa.", "Definir o conteúdo do contrato privado.", "Substituir a capacidade da parte.", "Eliminar a necessidade de petição."]), 0, "A competência organiza a atuação dos órgãos jurisdicionais e ajuda a identificar o juízo adequado, conforme as regras legais.", "Questão autoral OAB FÁCIL; confira o CPC vigente."),
+            (process_civil, "Na contagem de prazo processual, o estudante deve primeiro:", json.dumps(["Ignorar a data de publicação.", "Conferir a regra aplicável, o marco inicial e eventuais suspensões.", "Contar apenas dias corridos em qualquer caso.", "Usar prazo de outro procedimento."]), 1, "A contagem exige conferir a regra aplicável, o marco inicial e eventos que alterem o prazo.", "Questão autoral OAB FÁCIL; confira o CPC vigente."),
+            (process_civil, "A petição inicial deve ser estudada considerando:", json.dumps(["Seus requisitos, pedidos, causa de pedir e documentos pertinentes.", "Somente a assinatura do advogado.", "Apenas o valor da causa.", "Nenhuma regra de forma."]), 0, "A petição inicial reúne requisitos e elementos que delimitam a demanda, além dos documentos pertinentes.", "Questão autoral OAB FÁCIL; confira o CPC vigente."),
+            (process_civil, "Uma boa revisão de recursos deve relacionar:", json.dumps(["Cabimento, prazo, requisitos e efeitos.", "Somente o nome do recurso.", "Apenas a parte final da decisão.", "Somente a matéria de fato."]), 0, "O estudo de recursos deve conectar cabimento, prazo, requisitos e efeitos, sempre conforme a legislação vigente.", "Questão autoral OAB FÁCIL; material de estudo, não substitui a fonte oficial."),
+        ]
+        penal_questions = [
+            (penal, "O princípio da legalidade penal exige, em regra:", json.dumps(["Crime e pena definidos previamente por lei.", "Punição baseada apenas em costume.", "Aplicação de pena sem previsão legal.", "Decisão administrativa sem limites."]), 0, "A legalidade impede que alguém seja punido por fato ou pena sem previsão legal anterior, observadas as regras constitucionais.", "Questão autoral OAB FÁCIL; confira o Código Penal vigente."),
+            (penal, "Na análise do crime, uma organização didática comum considera:", json.dumps(["Fato típico, ilicitude e culpabilidade.", "Somente o resultado econômico.", "Apenas a confissão.", "Somente a existência de vítima."]), 0, "A estrutura tripartida é uma forma didática de organizar a análise do fato típico, da ilicitude e da culpabilidade.", "Questão autoral OAB FÁCIL; confira a doutrina e o Código Penal vigente."),
+            (penal, "No concurso de pessoas, é importante analisar:", json.dumps(["A contribuição dos envolvidos e o vínculo subjetivo, conforme a lei.", "Somente quem estava no local.", "Apenas o parentesco entre os agentes.", "Somente a existência de dano civil."]), 0, "A análise considera a contribuição dos envolvidos e os requisitos legais do concurso de pessoas.", "Questão autoral OAB FÁCIL; confira o Código Penal vigente."),
+            (penal, "Na aplicação da pena, o estudo deve considerar:", json.dumps(["As etapas e critérios previstos na legislação.", "A escolha livre sem fundamentação.", "Somente a opinião da vítima.", "Apenas a situação econômica do réu."]), 0, "A aplicação da pena deve observar critérios legais e fundamentação, conforme o caso concreto.", "Questão autoral OAB FÁCIL; confira o Código Penal vigente."),
+        ]
+        question_groups = {ethics: question_rows, civil: civil_questions, constitutional: constitutional_questions, process_civil: process_civil_questions, penal: penal_questions}
         for subject_id, rows_to_seed in question_groups.items():
             existing_questions = fetch_one(conn, "SELECT COUNT(*) FROM questions WHERE subject_id = %s", (subject_id,))[0]
             if existing_questions == 0:
