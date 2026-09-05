@@ -16,7 +16,7 @@ document.querySelector('#signup-form')?.addEventListener('submit', async (event)
   const submit = form.querySelector('button[type="submit"]');
   const message = document.querySelector('.form-message');
   submit.disabled = true;
-  message.textContent = 'Enviando seu cadastro…';
+  message.textContent = 'Criando seu acesso…';
 
   try {
     const response = await fetch('/api/cadastros', {
@@ -25,16 +25,16 @@ document.querySelector('#signup-form')?.addEventListener('submit', async (event)
       body: JSON.stringify({
         name: document.querySelector('#name').value.trim(),
         email: document.querySelector('#email').value.trim(),
+        password: document.querySelector('#password').value,
         consent: form.querySelector('input[type="checkbox"]').checked,
       }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Não foi possível concluir o cadastro.');
     message.textContent = data.message;
-    form.reset();
+    window.setTimeout(() => { window.location.href = '/aluno'; }, 500);
   } catch (error) {
     message.textContent = error.message;
-  } finally {
     submit.disabled = false;
   }
 });
