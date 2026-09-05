@@ -80,6 +80,15 @@ def ensure_schema():
                     task_id BIGINT NOT NULL REFERENCES study_tasks(id) ON DELETE CASCADE,
                     completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     PRIMARY KEY(user_id, task_id))""",
+                """CREATE TABLE IF NOT EXISTS subjects (
+                    id BIGSERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL UNIQUE,
+                    phase VARCHAR(20) NOT NULL, question_weight INTEGER NOT NULL DEFAULT 0,
+                    sort_order INTEGER NOT NULL DEFAULT 0)""",
+                """CREATE TABLE IF NOT EXISTS lessons (
+                    id BIGSERIAL PRIMARY KEY, subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                    title VARCHAR(180) NOT NULL, summary TEXT NOT NULL,
+                    source_note TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE(subject_id, title))""",
             ]
         else:
             statements = [
@@ -100,9 +109,62 @@ def ensure_schema():
                     user_id INTEGER NOT NULL, task_id INTEGER NOT NULL,
                     completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY(user_id, task_id))""",
+                """CREATE TABLE IF NOT EXISTS subjects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE,
+                    phase TEXT NOT NULL, question_weight INTEGER NOT NULL DEFAULT 0,
+                    sort_order INTEGER NOT NULL DEFAULT 0)""",
+                """CREATE TABLE IF NOT EXISTS lessons (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, subject_id INTEGER NOT NULL,
+                    title TEXT NOT NULL, summary TEXT NOT NULL,
+                    source_note TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE(subject_id, title))""",
             ]
         for statement in statements:
             execute(conn, statement)
+
+        subject_rows = [
+            ("Ética e Estatuto da OAB", "1ª fase", 8, 1),
+            ("Direito Civil", "1ª fase", 6, 2),
+            ("Processo Civil", "1ª fase", 6, 3),
+            ("Direito Constitucional", "1ª fase", 6, 4),
+            ("Direito Penal", "1ª fase", 6, 5),
+            ("Processo Penal", "1ª fase", 6, 6),
+            ("Direito Administrativo", "1ª fase", 5, 7),
+            ("Direito do Trabalho", "1ª fase", 5, 8),
+            ("Processo do Trabalho", "1ª fase", 5, 9),
+            ("Direito Tributário", "1ª fase", 5, 10),
+            ("Direito Empresarial", "1ª fase", 4, 11),
+            ("Direitos Humanos", "1ª fase", 2, 12),
+            ("Direito do Consumidor", "1ª fase", 2, 13),
+            ("ECA", "1ª fase", 2, 14),
+            ("Direito Ambiental", "1ª fase", 2, 15),
+            ("Direito Internacional", "1ª fase", 2, 16),
+            ("Filosofia do Direito", "1ª fase", 2, 17),
+            ("Direito Eleitoral", "1ª fase", 2, 18),
+            ("Direito Financeiro", "1ª fase", 2, 19),
+            ("Direito Previdenciário", "1ª fase", 2, 20),
+        ]
+        if is_postgres():
+            with conn.cursor() as cur:
+                cur.executemany("INSERT INTO subjects (name, phase, question_weight, sort_order) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING", subject_rows)
+        else:
+            conn.executemany("INSERT OR IGNORE INTO subjects (name, phase, question_weight, sort_order) VALUES (?, ?, ?, ?)", subject_rows)
+        ethics = fetch_one(conn, "SELECT id FROM subjects WHERE name = %s", ("Ética e Estatuto da OAB",))[0]
+        lesson_rows = [
+            (ethics, "Inscrição e atividade da advocacia", "Organize os requisitos, impedimentos e incompatibilidades para iniciar a revisão do Estatuto.", "Material autoral de revisão; confira sempre o texto oficial vigente.", 1),
+            (ethics, "Prerrogativas profissionais", "Estude as garantias essenciais ao exercício da advocacia e diferencie prerrogativa de privilégio.", "Material autoral de revisão; confira sempre o texto oficial vigente.", 2),
+            (ethics, "Honorários advocatícios", "Revise espécies, critérios de fixação, sucumbência e cuidados éticos na cobrança.", "Material autoral de revisão; confira sempre o texto oficial vigente.", 3),
+            (ethics, "Sociedade de advogados", "Mapeie as formas de organização, registro e responsabilidade profissional.", "Material autoral de revisão; confira sempre o texto oficial vigente.", 4),
+            (ethics, "Publicidade na advocacia", "Identifique os limites éticos da publicidade e da divulgação profissional.", "Material autoral de revisão; confira sempre o texto oficial vigente.", 5),
+            (ethics, "Infrações e sanções disciplinares", "Construa uma tabela com condutas, sanções e noções de processo disciplinar.", "Material autoral de revisão; confira sempre o texto oficial vigente.", 6),
+            (ethics, "Código de Ética e deveres profissionais", "Revise sigilo, independência, urbanidade, lealdade e relação com o cliente.", "Material autoral de revisão; confira sempre o texto oficial vigente.", 7),
+            (ethics, "Revisão por questões", "Faça um bloco de questões autorais e registre os pontos que precisam voltar para a revisão.", "Questões autorais do OAB FÁCIL; não reproduz questões protegidas de terceiros.", 8),
+        ]
+        if is_postgres():
+            with conn.cursor() as cur:
+                cur.executemany("INSERT INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING", lesson_rows)
+        else:
+            conn.executemany("INSERT OR IGNORE INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (?, ?, ?, ?, ?)", lesson_rows)
 
         for days in (30, 60, 90):
             existing = fetch_one(conn, "SELECT COUNT(*) FROM study_tasks WHERE plan_days = %s", (days,))[0]
@@ -286,6 +348,34 @@ def tasks():
         conn.close()
     items = [{"id": r[0], "day_number": r[1], "title": r[2], "description": r[3], "completed": bool(r[4])} for r in rows]
     return jsonify({"ok": True, "days": days, "total": len(items), "completed": sum(1 for item in items if item["completed"]), "tasks": items})
+
+
+@app.get("/api/subjects")
+def subjects():
+    if not logged_user_id():
+        return jsonify({"message": "Faça login para continuar."}), 401
+    conn = connection()
+    try:
+        rows = fetch_all(conn, "SELECT id, name, phase, question_weight FROM subjects ORDER BY sort_order")
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "subjects": [{"id": r[0], "name": r[1], "phase": r[2], "question_weight": r[3]} for r in rows]})
+
+
+@app.get("/api/lessons")
+def lessons():
+    if not logged_user_id():
+        return jsonify({"message": "Faça login para continuar."}), 401
+    subject_id = request.args.get("subject", type=int)
+    conn = connection()
+    try:
+        if subject_id:
+            rows = fetch_all(conn, "SELECT id, title, summary, source_note FROM lessons WHERE subject_id = %s ORDER BY sort_order", (subject_id,))
+        else:
+            rows = fetch_all(conn, "SELECT id, title, summary, source_note FROM lessons ORDER BY subject_id, sort_order")
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "lessons": [{"id": r[0], "title": r[1], "summary": r[2], "source_note": r[3]} for r in rows]})
 
 
 @app.post("/api/tasks/<int:task_id>/complete")
