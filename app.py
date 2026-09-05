@@ -109,6 +109,14 @@ def ensure_schema():
                     title VARCHAR(180) NOT NULL, detail TEXT NOT NULL,
                     completed BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     UNIQUE(user_id, question_id))""",
+                """CREATE TABLE IF NOT EXISTS practical_pieces (
+                    id BIGSERIAL PRIMARY KEY, subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                    title VARCHAR(180) NOT NULL, scenario TEXT NOT NULL, structure TEXT NOT NULL,
+                    checklist TEXT NOT NULL, source_note TEXT NOT NULL, UNIQUE(subject_id, title))""",
+                """CREATE TABLE IF NOT EXISTS discursive_questions (
+                    id BIGSERIAL PRIMARY KEY, subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                    prompt TEXT NOT NULL, model_answer TEXT NOT NULL, source_note TEXT NOT NULL,
+                    UNIQUE(subject_id, prompt))""",
             ]
         else:
             statements = [
@@ -155,6 +163,14 @@ def ensure_schema():
                     question_id INTEGER NOT NULL, title TEXT NOT NULL, detail TEXT NOT NULL,
                     completed INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(user_id, question_id))""",
+                """CREATE TABLE IF NOT EXISTS practical_pieces (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, subject_id INTEGER NOT NULL,
+                    title TEXT NOT NULL, scenario TEXT NOT NULL, structure TEXT NOT NULL,
+                    checklist TEXT NOT NULL, source_note TEXT NOT NULL, UNIQUE(subject_id, title))""",
+                """CREATE TABLE IF NOT EXISTS discursive_questions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, subject_id INTEGER NOT NULL,
+                    prompt TEXT NOT NULL, model_answer TEXT NOT NULL, source_note TEXT NOT NULL,
+                    UNIQUE(subject_id, prompt))""",
             ]
         for statement in statements:
             execute(conn, statement)
@@ -468,6 +484,32 @@ def ensure_schema():
                 else:
                     conn.executemany("INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (?, ?, ?, ?, ?, ?)", rows_to_seed)
 
+        practical_rows = [
+            (phase2_admin, "Mandado de segurança administrativo", "Ato ilegal de autoridade pública com prova pré-constituída.", "Endereçamento; partes; cabimento; fatos; direito; liminar; pedidos; fechamento.", "Autoridade coatora; prazo; prova; fundamento constitucional; pedido liminar.", "Material autoral OAB FÁCIL; confira o edital e a legislação vigente."),
+            (phase2_civil, "Apelação cível", "Parte vencida pretende impugnar sentença desfavorável.", "Interposição; razões; preliminares; mérito; pedidos; fechamento.", "Tempestividade; preparo; dialeticidade; fundamentos; pedido de reforma.", "Material autoral OAB FÁCIL; confira o edital e o CPC vigente."),
+            (phase2_constitutional, "Mandado de segurança constitucional", "Direito líquido e certo ameaçado por ato de autoridade.", "Competência; legitimidade; ato coator; fundamentos; liminar; pedidos.", "Autoridade; prazo; prova pré-constituída; adequação do remédio.", "Material autoral OAB FÁCIL; confira o edital e a Constituição vigente."),
+            (phase2_labour, "Contestação trabalhista", "Reclamado responde aos pedidos de reclamação trabalhista.", "Endereçamento; preliminares; prejudiciais; mérito; provas; requerimentos.", "Prescrição; impugnação específica; documentos; verbas; pedidos finais.", "Material autoral OAB FÁCIL; confira o edital e a CLT vigente."),
+            (phase2_business, "Petição de recuperação judicial", "Empresa viável em crise busca reorganização judicial.", "Endereçamento; crise; requisitos; documentos; pedidos.", "Legitimidade; requisitos; documentos indispensáveis; preservação.", "Material autoral OAB FÁCIL; confira o edital e a legislação vigente."),
+            (phase2_penal, "Apelação criminal", "Réu impugna sentença condenatória.", "Interposição; razões; preliminares; mérito; pedidos.", "Tempestividade; nulidades; prova; tipificação; pena; reforma.", "Material autoral OAB FÁCIL; confira o edital e o CPP vigente."),
+            (phase2_tax, "Ação anulatória tributária", "Contribuinte busca desconstituir cobrança indevida.", "Partes; fatos; cabimento; fundamentos; tutela; pedidos; provas.", "Ato impugnado; prazo; legitimidade; garantia; pedido tributário.", "Material autoral OAB FÁCIL; confira o edital, a Constituição e o CTN vigentes."),
+        ]
+        discursive_rows = [
+            (phase2_admin, "Diferencie anulação e revogação do ato administrativo.", "Anulação decorre de ilegalidade; revogação incide sobre ato válido por conveniência e oportunidade, respeitados os limites legais.", "Material autoral OAB FÁCIL; confira as fontes vigentes."),
+            (phase2_civil, "Apresente os requisitos gerais da tutela de urgência.", "Devem ser analisados probabilidade do direito e perigo de dano ou risco ao resultado útil, conforme o CPC.", "Material autoral OAB FÁCIL; confira o CPC vigente."),
+            (phase2_constitutional, "Indique a finalidade do mandado de injunção.", "Busca viabilizar direito, liberdade ou prerrogativa constitucional inviabilizada pela falta de norma regulamentadora.", "Material autoral OAB FÁCIL; confira a Constituição vigente."),
+            (phase2_labour, "Diferencie relação de trabalho e relação de emprego.", "Relação de emprego exige os elementos legais específicos; relação de trabalho é gênero mais amplo.", "Material autoral OAB FÁCIL; confira a CLT vigente."),
+            (phase2_business, "Indique a finalidade da recuperação judicial.", "Busca superar a crise econômico-financeira e preservar empresa viável, empregos e interesses envolvidos.", "Material autoral OAB FÁCIL; confira a legislação vigente."),
+            (phase2_penal, "Diferencie dolo e culpa.", "Dolo envolve vontade e consciência nos termos legais; culpa decorre de violação do dever de cuidado nas hipóteses legais.", "Material autoral OAB FÁCIL; confira o Código Penal vigente."),
+            (phase2_tax, "Diferencie imunidade e isenção.", "Imunidade é limitação constitucional à competência tributária; isenção é dispensa legal do pagamento em hipótese definida pela lei.", "Material autoral OAB FÁCIL; confira a Constituição e o CTN vigentes."),
+        ]
+        if is_postgres():
+            with conn.cursor() as cur:
+                cur.executemany("INSERT INTO practical_pieces (subject_id, title, scenario, structure, checklist, source_note) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING", practical_rows)
+                cur.executemany("INSERT INTO discursive_questions (subject_id, prompt, model_answer, source_note) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING", discursive_rows)
+        else:
+            conn.executemany("INSERT OR IGNORE INTO practical_pieces (subject_id, title, scenario, structure, checklist, source_note) VALUES (?, ?, ?, ?, ?, ?)", practical_rows)
+            conn.executemany("INSERT OR IGNORE INTO discursive_questions (subject_id, prompt, model_answer, source_note) VALUES (?, ?, ?, ?)", discursive_rows)
+
         for days in (30, 60, 90):
             existing = fetch_one(conn, "SELECT COUNT(*) FROM study_tasks WHERE plan_days = %s", (days,))[0]
             if existing == 0:
@@ -678,6 +720,22 @@ def lessons():
     finally:
         conn.close()
     return jsonify({"ok": True, "lessons": [{"id": r[0], "title": r[1], "summary": r[2], "source_note": r[3]} for r in rows]})
+
+
+@app.get("/api/phase2/materials")
+def phase2_materials():
+    if not logged_user_id():
+        return jsonify({"message": "Faça login para continuar."}), 401
+    subject_id = request.args.get("subject", type=int)
+    if not subject_id:
+        return jsonify({"message": "Informe a área da 2ª fase."}), 400
+    conn = connection()
+    try:
+        pieces = fetch_all(conn, "SELECT id, title, scenario, structure, checklist, source_note FROM practical_pieces WHERE subject_id = %s ORDER BY id", (subject_id,))
+        discursives = fetch_all(conn, "SELECT id, prompt, model_answer, source_note FROM discursive_questions WHERE subject_id = %s ORDER BY id", (subject_id,))
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "pieces": [{"id": r[0], "title": r[1], "scenario": r[2], "structure": r[3], "checklist": r[4], "source_note": r[5]} for r in pieces], "discursives": [{"id": r[0], "prompt": r[1], "model_answer": r[2], "source_note": r[3]} for r in discursives]})
 
 
 @app.get("/api/calendar")
