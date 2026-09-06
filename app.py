@@ -28,6 +28,7 @@ SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 MAIL_FROM = os.getenv("MAIL_FROM", SMTP_USER).strip()
 PREMIUM_EMAILS = {email.strip().lower() for email in os.getenv("PREMIUM_EMAILS", "").split(",") if email.strip()}
+PIX_KEY = os.getenv("PIX_KEY", "").strip()
 RATE_BUCKETS = defaultdict(deque)
 
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
@@ -785,7 +786,7 @@ def access_status(user_id):
         used = fetch_one(conn, "SELECT COUNT(*) FROM general_mock_attempts WHERE user_id = %s", (user_id,))[0]
     finally:
         conn.close()
-    return {"tier": "premium" if premium else "free", "premium": premium, "general_mock_used": used, "general_mock_limit": None if premium else 1, "general_mock_remaining": None if premium else max(0, 1 - used), "phase2_enabled": premium}
+    return {"tier": "premium" if premium else "free", "premium": premium, "general_mock_used": used, "general_mock_limit": None if premium else 1, "general_mock_remaining": None if premium else max(0, 1 - used), "phase2_enabled": premium, "pix_key": PIX_KEY if premium else None}
 
 
 def premium_required(user_id):
