@@ -34,6 +34,36 @@ app.secret_key = SESSION_SECRET
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=True)
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
+# Guias de estudo autorais: orientam a leitura e a revisão sem substituir
+# o edital, a legislação, a jurisprudência ou as fontes oficiais vigentes.
+STUDY_GUIDES = {
+    "Ética e Estatuto da OAB": ("Estatuto, Código de Ética, prerrogativas, honorários, publicidade, infrações e sanções.", "Diferencie impedimento de incompatibilidade e relacione dever, conduta, consequência e órgão competente."),
+    "Direito Civil": ("Parte geral, obrigações, contratos, responsabilidade civil, direitos reais, família e sucessões.", "Leia o caso antes de escolher o instituto e confira requisitos, exceções e efeitos jurídicos."),
+    "Processo Civil": ("Competência, sujeitos, atos e prazos, tutela, procedimento comum, provas e recursos.", "Separe cabimento, prazo, preparo, efeitos e pedido; não confunda questão processual com mérito."),
+    "Direito Constitucional": ("Direitos fundamentais, remédios constitucionais, organização do Estado, Poderes e controle de constitucionalidade.", "Identifique legitimidade, objeto, competência e efeito antes de escolher a medida constitucional."),
+    "Direito Penal": ("Princípios, teoria do crime, concurso de pessoas, penas, concurso de crimes e crimes em espécie.", "Faça a sequência fato típico, ilicitude e culpabilidade e confira dolo, culpa, tentativa e consumação."),
+    "Processo Penal": ("Investigação, ação penal, competência, provas, cautelares, procedimentos e recursos criminais.", "Diferencie investigação, ação e julgamento e confira a finalidade e os requisitos de cada medida."),
+    "Direito Administrativo": ("Princípios, atos, poderes, agentes, serviços, bens, responsabilidade do Estado e contratações públicas.", "Diferencie anulação e revogação e confira competência, finalidade, motivo e controle do ato."),
+    "Direito do Trabalho": ("Relação de emprego, contrato, jornada, remuneração, férias, rescisão, proteção e negociação coletiva.", "Identifique os fatos que caracterizam a relação e organize parcelas, requisitos e limites legais."),
+    "Processo do Trabalho": ("Organização da Justiça do Trabalho, competência, reclamação, audiência, prova, sentença e recursos.", "Confira rito, prazo, ônus da prova e recurso cabível conforme o ato processual apresentado."),
+    "Direito Tributário": ("Sistema tributário, espécies, competência, limitações, obrigação, crédito, lançamento e garantias.", "Separe competência, fato gerador, sujeito, lançamento, exigibilidade e forma de defesa."),
+    "Direito Empresarial": ("Empresário, empresa, sociedades, títulos de crédito, contratos empresariais e crise da empresa.", "Diferencie pessoa jurídica, responsabilidade dos sócios e efeitos da recuperação ou falência."),
+    "Direitos Humanos": ("Dignidade, universalidade, tratados, sistemas global e interamericano e proteção internacional.", "Confira status normativo, órgão de proteção, requisito de admissibilidade e medida adequada."),
+    "Direito do Consumidor": ("Relação de consumo, responsabilidade, práticas comerciais, contratos, serviços e defesa coletiva.", "Identifique consumidor e fornecedor e diferencie vício, fato do produto ou serviço e prática abusiva."),
+    "ECA": ("Proteção integral, direitos fundamentais, medidas de proteção, ato infracional e Conselho Tutelar.", "Use a prioridade absoluta e o melhor interesse como eixo, conferindo idade, medida e competência."),
+    "Direito Ambiental": ("Princípios, competências, licenciamento, espaços protegidos e responsabilidade ambiental.", "Diferencie prevenção e precaução e organize as responsabilidades civil, administrativa e penal."),
+    "Direito Internacional": ("Fontes, tratados, nacionalidade, condição jurídica do estrangeiro, conflitos e cooperação.", "Identifique a fonte aplicável, o critério de conexão e o procedimento de cooperação adequado."),
+    "Filosofia do Direito": ("Jusnaturalismo, positivismo, justiça, equidade, interpretação, direito e moral.", "Relacione autor, corrente e conceito sem confundir descrição histórica com juízo de valor."),
+    "Direito Eleitoral": ("Direitos políticos, alistamento, partidos, candidaturas, eleições e inelegibilidades.", "Confira capacidade eleitoral, condição de elegibilidade, causa de inelegibilidade e prazo aplicável."),
+    "Direito Financeiro": ("Orçamento, PPA, LDO, LOA, receita, despesa, crédito público e responsabilidade fiscal.", "Organize o ciclo orçamentário e diferencie planejamento, execução, controle e limite fiscal."),
+    "Direito Previdenciário": ("Seguridade, RGPS, filiação, custeio, benefícios, dependentes e proteção social.", "Confira qualidade de segurado, carência, dependência, requisito do benefício e regra de transição."),
+}
+
+
+def study_guide(name):
+    focus, attention = STUDY_GUIDES.get(name, ("Conceitos centrais, legislação aplicável, casos práticos e revisão por questões.", "Confira o texto oficial vigente, identifique os requisitos e revise as exceções."))
+    return {"focus": focus, "attention": attention}
+
 
 def is_postgres():
     return bool(DATABASE_URL)
@@ -958,7 +988,7 @@ def subjects():
         rows = fetch_all(conn, "SELECT s.id, s.name, s.phase, s.question_weight, COUNT(q.id) FROM subjects s LEFT JOIN questions q ON q.subject_id = s.id GROUP BY s.id, s.name, s.phase, s.question_weight, s.sort_order ORDER BY s.sort_order")
     finally:
         conn.close()
-    return jsonify({"ok": True, "subjects": [{"id": r[0], "name": r[1], "phase": r[2], "question_weight": r[3], "questions": r[4]} for r in rows]})
+    return jsonify({"ok": True, "subjects": [{"id": r[0], "name": r[1], "phase": r[2], "question_weight": r[3], "questions": r[4], "guide": study_guide(r[1].replace("2ª fase — ", ""))} for r in rows]})
 
 
 @app.get("/api/lessons")
