@@ -150,7 +150,11 @@ def ensure_schema():
                     email VARCHAR(254) NOT NULL UNIQUE, password_hash TEXT NOT NULL,
                     consent_at TIMESTAMPTZ NOT NULL, plan_days INTEGER NOT NULL DEFAULT 30,
                     access_tier VARCHAR(20) NOT NULL DEFAULT 'free',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""", 
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+                """CREATE TABLE IF NOT EXISTS premium_requests (
+                    id BIGSERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL,
+                    email VARCHAR(254) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
                 """CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     token_hash VARCHAR(128) NOT NULL UNIQUE, expires_at TIMESTAMPTZ NOT NULL,
@@ -233,7 +237,11 @@ def ensure_schema():
                     email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
                     consent_at TEXT NOT NULL, plan_days INTEGER NOT NULL DEFAULT 30,
                     access_tier TEXT NOT NULL DEFAULT 'free',
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""", 
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE IF NOT EXISTS premium_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+                    email TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
                 """CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
                     token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL,
@@ -991,6 +999,29 @@ def access():
     return jsonify({"ok": True, "access": access_status(user_id)})
 
 
+@app.post("/api/premium/request")
+def premium_request():
+    if limited(client_key("premium-request"), 5, 3600):
+        return jsonify({"ok": False, "message": "Muitas solicitações. Tente novamente mais tarde."}), 429
+    payload = request.get_json(silent=True) or request.form
+    user_id = logged_user_id()
+    name = str(payload.get("name", "")).strip()
+    email = str(payload.get("email", "")).strip().lower()
+    if user_id:
+        user = user_row(user_id)
+        name = name or user[1]
+        email = email or user[2]
+    if not name or len(name) > 120 or not EMAIL_RE.match(email) or len(email) > 254:
+        return jsonify({"ok": False, "message": "Informe nome e e-mail válidos."}), 400
+    conn = connection()
+    try:
+        execute(conn, "INSERT INTO premium_requests (name, email) VALUES (%s, %s)", (name, email))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": "Solicitação registrada. A ativação será concluída após a confirmação do pagamento."}), 201
+
+
 @app.post("/api/plan")
 def choose_plan():
     user_id = logged_user_id()
@@ -1640,6 +1671,17 @@ def set_user_tier(user_id):
     finally:
         conn.close()
     return jsonify({"ok": True, "user_id": user_id, "tier": tier})
+
+
+@app.get("/api/admin/premium-requests")
+@admin_required
+def premium_requests():
+    conn = connection()
+    try:
+        rows = fetch_all(conn, "SELECT id, name, email, status, created_at FROM premium_requests ORDER BY id DESC")
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "requests": [{"id": r[0], "name": r[1], "email": r[2], "status": r[3], "created_at": r[4]} for r in rows]})
 
 
 @app.get("/api/admin/resumo")
