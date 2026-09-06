@@ -27,6 +27,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 MAIL_FROM = os.getenv("MAIL_FROM", SMTP_USER).strip()
+PREMIUM_EMAILS = {email.strip().lower() for email in os.getenv("PREMIUM_EMAILS", "").split(",") if email.strip()}
 RATE_BUCKETS = defaultdict(deque)
 
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
@@ -148,7 +149,8 @@ def ensure_schema():
                     id BIGSERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL,
                     email VARCHAR(254) NOT NULL UNIQUE, password_hash TEXT NOT NULL,
                     consent_at TIMESTAMPTZ NOT NULL, plan_days INTEGER NOT NULL DEFAULT 30,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+                    access_tier VARCHAR(20) NOT NULL DEFAULT 'free',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""", 
                 """CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     token_hash VARCHAR(128) NOT NULL UNIQUE, expires_at TIMESTAMPTZ NOT NULL,
@@ -191,6 +193,10 @@ def ensure_schema():
                     subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
                     score INTEGER NOT NULL, total INTEGER NOT NULL, answers_json TEXT NOT NULL,
                     completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+                """CREATE TABLE IF NOT EXISTS general_mock_attempts (
+                    id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    score INTEGER NOT NULL, total INTEGER NOT NULL, answers_json TEXT NOT NULL,
+                    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
                 """CREATE TABLE IF NOT EXISTS calendar_events (
                     id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     title VARCHAR(180) NOT NULL, event_date DATE NOT NULL, category VARCHAR(40) NOT NULL,
@@ -226,7 +232,8 @@ def ensure_schema():
                     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
                     email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
                     consent_at TEXT NOT NULL, plan_days INTEGER NOT NULL DEFAULT 30,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                    access_tier TEXT NOT NULL DEFAULT 'free',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""", 
                 """CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
                     token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL,
@@ -265,6 +272,10 @@ def ensure_schema():
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
                     subject_id INTEGER NOT NULL, score INTEGER NOT NULL, total INTEGER NOT NULL,
                     answers_json TEXT NOT NULL, completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE IF NOT EXISTS general_mock_attempts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+                    score INTEGER NOT NULL, total INTEGER NOT NULL, answers_json TEXT NOT NULL,
+                    completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
                 """CREATE TABLE IF NOT EXISTS calendar_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
                     title TEXT NOT NULL, event_date TEXT NOT NULL, category TEXT NOT NULL,
@@ -290,6 +301,15 @@ def ensure_schema():
             ]
         for statement in statements:
             execute(conn, statement)
+        # Migração segura para instalações já existentes.
+        try:
+            if is_postgres():
+                execute(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS access_tier VARCHAR(20) NOT NULL DEFAULT 'free'")
+            else:
+                execute(conn, "ALTER TABLE users ADD COLUMN access_tier TEXT NOT NULL DEFAULT 'free'")
+        except Exception:
+            # A coluna já existe em instalações novas ou já migradas.
+            pass
 
         subject_rows = [
             ("Ética e Estatuto da OAB", "1ª fase", 8, 1),
@@ -740,9 +760,29 @@ def logged_user_id():
 def user_row(user_id):
     conn = connection()
     try:
-        return fetch_one(conn, "SELECT id, name, email, plan_days FROM users WHERE id = %s", (user_id,))
+        return fetch_one(conn, "SELECT id, name, email, plan_days, access_tier FROM users WHERE id = %s", (user_id,))
     finally:
         conn.close()
+
+
+def is_premium_user(user):
+    return bool(user and (str(user[4] or "").lower() == "premium" or str(user[2]).lower() in PREMIUM_EMAILS))
+
+
+def access_status(user_id):
+    user = user_row(user_id)
+    premium = is_premium_user(user)
+    conn = connection()
+    try:
+        used = fetch_one(conn, "SELECT COUNT(*) FROM general_mock_attempts WHERE user_id = %s", (user_id,))[0]
+    finally:
+        conn.close()
+    return {"tier": "premium" if premium else "free", "premium": premium, "general_mock_used": used, "general_mock_limit": None if premium else 1, "general_mock_remaining": None if premium else max(0, 1 - used), "phase2_enabled": premium}
+
+
+def premium_required(user_id):
+    status = access_status(user_id)
+    return None if status["premium"] else (jsonify({"ok": False, "message": "Este conteúdo faz parte do acesso Premium.", "upgrade_required": True, "access": status}), 402)
 
 
 @app.before_request
@@ -939,7 +979,16 @@ def me():
     row = user_row(logged_user_id()) if logged_user_id() else None
     if not row:
         return jsonify({"ok": False, "message": "Faça login para continuar."}), 401
-    return jsonify({"ok": True, "user": {"id": row[0], "name": row[1], "email": row[2], "plan_days": row[3]}})
+    access = access_status(row[0])
+    return jsonify({"ok": True, "user": {"id": row[0], "name": row[1], "email": row[2], "plan_days": row[3], "access": access}})
+
+
+@app.get("/api/access")
+def access():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    return jsonify({"ok": True, "access": access_status(user_id)})
 
 
 @app.post("/api/plan")
@@ -1009,8 +1058,12 @@ def lessons():
 
 @app.get("/api/phase2/mock")
 def phase2_mock():
-    if not logged_user_id():
+    user_id = logged_user_id()
+    if not user_id:
         return jsonify({"message": "Faça login para continuar."}), 401
+    denied = premium_required(user_id)
+    if denied:
+        return denied
     subject_id = request.args.get("subject", type=int)
     if not subject_id:
         return jsonify({"message": "Informe a área da 2ª fase."}), 400
@@ -1030,6 +1083,9 @@ def submit_phase2_mock():
     user_id = logged_user_id()
     if not user_id:
         return jsonify({"message": "Faça login para continuar."}), 401
+    denied = premium_required(user_id)
+    if denied:
+        return denied
     payload = request.get_json(silent=True) or {}
     subject_id = int(payload.get("subject_id", 0) or 0)
     piece_id = int(payload.get("piece_id", 0) or 0)
@@ -1106,8 +1162,12 @@ def complete_phase2_review(review_id):
 
 @app.get("/api/phase2/materials")
 def phase2_materials():
-    if not logged_user_id():
+    user_id = logged_user_id()
+    if not user_id:
         return jsonify({"message": "Faça login para continuar."}), 401
+    denied = premium_required(user_id)
+    if denied:
+        return denied
     subject_id = request.args.get("subject", type=int)
     if not subject_id:
         return jsonify({"message": "Informe a área da 2ª fase."}), 400
@@ -1125,6 +1185,9 @@ def assess_discursive():
     user_id = logged_user_id()
     if not user_id:
         return jsonify({"message": "Faça login para continuar."}), 401
+    denied = premium_required(user_id)
+    if denied:
+        return denied
     payload = request.get_json(silent=True) or {}
     subject_id = int(payload.get("subject_id", 0) or 0)
     question_id = int(payload.get("question_id", 0) or 0)
@@ -1238,8 +1301,12 @@ def complete_review(review_id):
 
 @app.get("/api/simulado")
 def general_mock_exam():
-    if not logged_user_id():
+    user_id = logged_user_id()
+    if not user_id:
         return jsonify({"message": "Faça login para continuar."}), 401
+    access = access_status(user_id)
+    if not access["premium"] and access["general_mock_used"] >= 1:
+        return jsonify({"ok": False, "message": "Seu acesso gratuito já utilizou o simulado disponível.", "upgrade_required": True, "access": access}), 402
     conn = connection()
     try:
         rows = fetch_all(conn, """SELECT q.id, q.prompt, q.options_json, q.subject_id, s.name, s.question_weight, s.sort_order
@@ -1270,6 +1337,9 @@ def submit_general_mock_exam():
     user_id = logged_user_id()
     if not user_id:
         return jsonify({"message": "Faça login para continuar."}), 401
+    access = access_status(user_id)
+    if not access["premium"] and access["general_mock_used"] >= 1:
+        return jsonify({"ok": False, "message": "Seu acesso gratuito já utilizou o simulado disponível.", "upgrade_required": True, "access": access}), 402
     payload = request.get_json(silent=True) or {}
     raw_answers = payload.get("answers", {})
     question_ids = payload.get("question_ids", [])
@@ -1304,6 +1374,7 @@ def submit_general_mock_exam():
                     execute(conn, "INSERT INTO review_items (user_id, question_id, title, detail) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING", (user_id, row[0], f"Revisar questão de {row[5]}", row[3]))
                 else:
                     execute(conn, "INSERT OR IGNORE INTO review_items (user_id, question_id, title, detail) VALUES (%s, %s, %s, %s)", (user_id, row[0], f"Revisar questão de {row[5]}", row[3]))
+        execute(conn, "INSERT INTO general_mock_attempts (user_id, score, total, answers_json) VALUES (%s, %s, %s, %s)", (user_id, score, len(corrections), json.dumps({"question_ids": ids, "answers": raw_answers})))
         conn.commit()
     finally:
         conn.close()
@@ -1554,6 +1625,21 @@ def registrations_csv():
     writer.writerow(["id", "nome", "email", "aceite_lgpd_em", "cadastrado_em"])
     writer.writerows(rows)
     return Response(output.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=oab-facil-cadastros.csv"})
+
+
+@app.post("/api/admin/users/<int:user_id>/tier")
+@admin_required
+def set_user_tier(user_id):
+    tier = str((request.get_json(silent=True) or {}).get("tier", "free")).strip().lower()
+    if tier not in {"free", "premium"}:
+        return jsonify({"message": "O nível precisa ser free ou premium."}), 400
+    conn = connection()
+    try:
+        execute(conn, "UPDATE users SET access_tier = %s WHERE id = %s", (tier, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "user_id": user_id, "tier": tier})
 
 
 @app.get("/api/admin/resumo")
