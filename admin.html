@@ -38,10 +38,12 @@
       <div class="card"><h2>Aulas cadastradas</h2><div id="lessons" class="list"></div></div>
       <div class="card"><h2>Questões cadastradas</h2><div id="questions" class="list"></div></div>
       <div class="card"><h2>Relatório de desempenho</h2><button id="load-performance">Atualizar relatório</button><div id="performance" class="list"></div></div>
+      <div class="card"><h2>Solicitações Premium</h2><p class="muted">Ative o acesso somente depois de confirmar o pagamento. O aluno precisa ter cadastro com o mesmo e-mail.</p><div id="premium-requests" class="list"><p class="muted">Carregue o painel para consultar.</p></div></div>
     </section>
   </main>
   <script>
     const $=id=>document.querySelector(id), token=$('#token'), status=$('#status'); let subjects=[];
+    const escapeHtml=value=>String(value??'').replace(/[&<>'"]/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
     function headers(){return {'Content-Type':'application/json','X-Admin-Token':token.value};}
     function fillSubjects(){['#lesson-subject','#question-subject'].forEach(selector=>{$(selector).innerHTML=subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');});$('#subjects').innerHTML=subjects.map(s=>`<div class="item"><strong>${s.name}</strong><span class="small">${s.phase} · referência: ${s.question_weight} questões · ${s.questions} cadastradas</span></div>`).join('');}
     async function loadPanel(){
@@ -49,6 +51,9 @@
       const response=await fetch('/api/admin/conteudos',{headers:{'X-Admin-Token':token.value}}); const data=await response.json();
       if(!response.ok) throw new Error(data.error||data.message||'Não foi possível carregar.');
       subjects=data.subjects; fillSubjects();
+      const premiumResponse=await fetch('/api/admin/premium-requests',{headers:{'X-Admin-Token':token.value}}); const premiumData=await premiumResponse.json();
+      if(!premiumResponse.ok) throw new Error(premiumData.error||premiumData.message||'Não foi possível carregar as solicitações Premium.');
+      const premiumBox=$('#premium-requests'); premiumBox.innerHTML=premiumData.requests.length?premiumData.requests.map(item=>`<div class="item"><strong>${escapeHtml(item.name)} · ${escapeHtml(item.email)}</strong><span class="small">${escapeHtml(item.status)} · ${escapeHtml(item.created_at)}</span>${item.status==='activated'?'<span class="small">Acesso já ativado.</span>':`<button data-activate-premium="${item.id}">Ativar Premium</button>`}</div>`).join(''):'<p class="muted">Nenhuma solicitação recebida.</p>'; premiumBox.querySelectorAll('[data-activate-premium]').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;const response=await fetch(`/api/admin/premium-requests/${button.dataset.activatePremium}/activate`,{method:'POST',headers:headers()});const result=await response.json();status.textContent=result.message||'Solicitação processada.';if(response.ok)await loadPanel();else button.disabled=false;}));
       $('#lessons').innerHTML=data.lessons.map(l=>{const item=document.createElement('div');item.className='item';item.innerHTML=`<strong>${l.title}</strong><span class="small">${subjects.find(s=>s.id===l.subject_id)?.name||'Disciplina'} · ${l.summary}</span><button data-edit-lesson="${l.id}">Editar</button> <button class="danger" data-delete-lesson="${l.id}">Excluir</button>`;item.querySelector('[data-delete-lesson]').addEventListener('click',()=>deleteContent('lessons',l.id));item.querySelector('[data-edit-lesson]').addEventListener('click',()=>editLesson(l));return item;});
       $('#questions').innerHTML=data.questions.map(q=>{const item=document.createElement('div');item.className='item';item.innerHTML=`<strong>${q.prompt}</strong><span class="small">${subjects.find(s=>s.id===q.subject_id)?.name||'Disciplina'} · correta: ${String.fromCharCode(65+q.answer_index)}</span><button data-edit-question="${q.id}">Editar</button> <button class="danger" data-delete-question="${q.id}">Excluir</button>`;item.querySelector('[data-delete-question]').addEventListener('click',()=>deleteContent('questions',q.id));item.querySelector('[data-edit-question]').addEventListener('click',()=>editQuestion(q));return item;});
       $('#content-panel').hidden=false; $('#download').hidden=false; status.textContent=`Painel carregado: ${data.lessons.length} aulas e ${data.questions.length} questões.`;

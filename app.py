@@ -1685,6 +1685,25 @@ def premium_requests():
     return jsonify({"ok": True, "requests": [{"id": r[0], "name": r[1], "email": r[2], "status": r[3], "created_at": r[4]} for r in rows]})
 
 
+@app.post("/api/admin/premium-requests/<int:request_id>/activate")
+@admin_required
+def activate_premium_request(request_id):
+    conn = connection()
+    try:
+        request_row = fetch_one(conn, "SELECT name, email, status FROM premium_requests WHERE id = %s", (request_id,))
+        if not request_row:
+            return jsonify({"message": "Solicitação não encontrada."}), 404
+        user = fetch_one(conn, "SELECT id FROM users WHERE email = %s", (request_row[1].lower(),))
+        if not user:
+            return jsonify({"message": "O aluno ainda não possui cadastro com este e-mail."}), 409
+        execute(conn, "UPDATE users SET access_tier = 'premium' WHERE id = %s", (user[0],))
+        execute(conn, "UPDATE premium_requests SET status = 'activated' WHERE id = %s", (request_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": "Acesso Premium ativado para o aluno."})
+
+
 @app.get("/api/admin/resumo")
 @admin_required
 def registrations_summary():
