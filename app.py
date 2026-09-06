@@ -436,6 +436,32 @@ def ensure_schema():
                 cur.executemany("INSERT INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING", lesson_rows)
         else:
             conn.executemany("INSERT OR IGNORE INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (?, ?, ?, ?, ?)", lesson_rows)
+        # Expansão didática: cada matéria recebe mapa de incidência, treino de questões
+        # e revisão ativa, mantendo o catálogo autoral e a fonte oficial indicada.
+        subject_catalog = fetch_all(conn, "SELECT id, name, phase FROM subjects ORDER BY sort_order")
+        expanded_lesson_rows = []
+        for subject_id, subject_name, phase in subject_catalog:
+            if phase == "1ª fase":
+                extra_lessons = [
+                    ("Mapa de alta incidência", f"Organize os conceitos mais cobrados de {subject_name}, conectando definição, fundamento legal e aplicação em caso concreto.", "Material autoral OAB FÁCIL; confira a legislação e a fonte oficial vigentes.", 5),
+                    ("Questões, pegadinhas e erros", f"Resolva questões de {subject_name}, registre as alternativas descartadas e explique por que a resposta correta se sustenta.", "Material autoral OAB FÁCIL; questões autorais, confira a fonte oficial vigente.", 6),
+                    ("Revisão ativa e véspera", f"Faça uma revisão final de {subject_name} com mapa de uma página, palavras-chave, exceções e dois exemplos práticos.", "Material autoral OAB FÁCIL; confira o edital e a legislação vigentes.", 7),
+                ]
+            elif phase == "2ª fase":
+                extra_lessons = [
+                    ("Checklist da peça", f"Monte o checklist de identificação, endereçamento, cabimento, fundamentos, pedidos e fechamento para {subject_name}.", "Material autoral OAB FÁCIL; confira o edital e os padrões oficiais vigentes.", 4),
+                    ("Treino de fundamentação", f"Pratique a aplicação dos fundamentos de {subject_name} aos fatos do enunciado, sem copiar modelos fora do caso.", "Material autoral OAB FÁCIL; confira a legislação vigente.", 5),
+                    ("Revisão em cinco horas", f"Distribua o tempo da prova de {subject_name} entre leitura, peça, questões, conferência e transcrição final.", "Material autoral OAB FÁCIL; confira o edital vigente.", 6),
+                ]
+            else:
+                extra_lessons = []
+            expanded_lesson_rows.extend((subject_id, title, summary, source_note, sort_order) for title, summary, source_note, sort_order in extra_lessons)
+        if is_postgres():
+            with conn.cursor() as cur:
+                cur.executemany("INSERT INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING", expanded_lesson_rows)
+        else:
+            conn.executemany("INSERT OR IGNORE INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (?, ?, ?, ?, ?)", expanded_lesson_rows)
+
         question_rows = [
             (ethics, "Na publicidade profissional da advocacia, a conduta adequada é:", json.dumps(["Prometer resultado para atrair clientes.", "Divulgar informação objetiva e discreta, sem captação indevida.", "Comparar diretamente seus serviços com os de outro advogado.", "Distribuir publicidade em qualquer formato sem limites."]), 1, "A publicidade profissional deve ser informativa, discreta e compatível com a ética, sem promessa de resultado ou captação indevida.", "Questão autoral OAB FÁCIL; confira a regulamentação vigente antes da publicação definitiva."),
             (ethics, "Sobre o sigilo profissional, é correto afirmar que:", json.dumps(["É opcional quando o cliente não assina contrato.", "Só existe durante o processo judicial.", "É dever profissional e pode ter exceções justificadas previstas na regulamentação.", "Pode ser afastado sempre que houver interesse comercial."]), 2, "O sigilo é um dever profissional amplo; suas exceções devem ser justificadas e observadas conforme a legislação e a regulamentação vigente.", "Questão autoral OAB FÁCIL; confira o texto oficial vigente."),
