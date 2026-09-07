@@ -154,7 +154,8 @@ def ensure_schema():
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
                 """CREATE TABLE IF NOT EXISTS premium_requests (
                     id BIGSERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL,
-                    email VARCHAR(254) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    email VARCHAR(254) NOT NULL, donation_amount_cents INTEGER NOT NULL DEFAULT 100,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), activated_at TIMESTAMPTZ NULL)""", 
                 """CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -241,7 +242,8 @@ def ensure_schema():
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
                 """CREATE TABLE IF NOT EXISTS premium_requests (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
-                    email TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+                    email TEXT NOT NULL, donation_amount_cents INTEGER NOT NULL DEFAULT 100,
+                    status TEXT NOT NULL DEFAULT 'pending',
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, activated_at TEXT NULL)""", 
                 """CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
@@ -324,6 +326,13 @@ def ensure_schema():
                 execute(conn, "ALTER TABLE premium_requests ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ NULL")
             else:
                 execute(conn, "ALTER TABLE premium_requests ADD COLUMN activated_at TEXT NULL")
+        except Exception:
+            pass
+        try:
+            if is_postgres():
+                execute(conn, "ALTER TABLE premium_requests ADD COLUMN IF NOT EXISTS donation_amount_cents INTEGER NOT NULL DEFAULT 100")
+            else:
+                execute(conn, "ALTER TABLE premium_requests ADD COLUMN donation_amount_cents INTEGER NOT NULL DEFAULT 100")
         except Exception:
             pass
 
@@ -1007,6 +1016,10 @@ def access():
     return jsonify({"ok": True, "access": access_status(user_id)})
 
 
+def format_brl(cents):
+    return f"R$ {cents / 100:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 @app.post("/api/premium/request")
 def premium_request():
     if limited(client_key("premium-request"), 5, 3600):
@@ -1015,19 +1028,26 @@ def premium_request():
     user_id = logged_user_id()
     name = str(payload.get("name", "")).strip()
     email = str(payload.get("email", "")).strip().lower()
+    raw_amount = str(payload.get("donation_amount", "1")).strip().replace(",", ".")
+    try:
+        donation_amount_cents = int(round(float(raw_amount) * 100))
+    except (TypeError, ValueError):
+        donation_amount_cents = 0
     if user_id:
         user = user_row(user_id)
         name = name or user[1]
         email = email or user[2]
     if not name or len(name) > 120 or not EMAIL_RE.match(email) or len(email) > 254:
         return jsonify({"ok": False, "message": "Informe nome e e-mail válidos."}), 400
+    if donation_amount_cents < 100:
+        return jsonify({"ok": False, "message": "A doação voluntária precisa ser de pelo menos R$ 1,00."}), 400
     conn = connection()
     try:
-        execute(conn, "INSERT INTO premium_requests (name, email) VALUES (%s, %s)", (name, email))
+        execute(conn, "INSERT INTO premium_requests (name, email, donation_amount_cents) VALUES (%s, %s, %s)", (name, email, donation_amount_cents))
         conn.commit()
     finally:
         conn.close()
-    return jsonify({"ok": True, "message": "Solicitação registrada. A ativação será concluída após a confirmação do pagamento."}), 201
+    return jsonify({"ok": True, "message": "Solicitação registrada. Após a confirmação da doação, a ativação será concluída."}), 201
 
 
 @app.post("/api/plan")
@@ -1686,10 +1706,10 @@ def set_user_tier(user_id):
 def premium_requests():
     conn = connection()
     try:
-        rows = fetch_all(conn, "SELECT id, name, email, status, created_at, activated_at FROM premium_requests ORDER BY id DESC")
+        rows = fetch_all(conn, "SELECT id, name, email, donation_amount_cents, status, created_at, activated_at FROM premium_requests ORDER BY id DESC")
     finally:
         conn.close()
-    return jsonify({"ok": True, "requests": [{"id": r[0], "name": r[1], "email": r[2], "status": r[3], "created_at": r[4], "activated_at": r[5]} for r in rows]})
+    return jsonify({"ok": True, "requests": [{"id": r[0], "name": r[1], "email": r[2], "donation_amount_cents": r[3], "donation_amount": format_brl(r[3]), "status": r[4], "created_at": r[5], "activated_at": r[6]} for r in rows]})
 
 
 @app.get("/api/admin/premium-summary")
@@ -1700,10 +1720,12 @@ def premium_summary():
         pending = fetch_one(conn, "SELECT COUNT(*) FROM premium_requests WHERE status = 'pending'")[0]
         activated = fetch_one(conn, "SELECT COUNT(*) FROM premium_requests WHERE status = 'activated'")[0]
         premium_users = fetch_one(conn, "SELECT COUNT(*) FROM users WHERE access_tier = 'premium'")[0]
-        recent = fetch_all(conn, "SELECT name, email, activated_at FROM premium_requests WHERE status = 'activated' ORDER BY activated_at DESC LIMIT 10")
+        pending_amount = fetch_one(conn, "SELECT COALESCE(SUM(donation_amount_cents), 0) FROM premium_requests WHERE status = 'pending'")[0]
+        activated_amount = fetch_one(conn, "SELECT COALESCE(SUM(donation_amount_cents), 0) FROM premium_requests WHERE status = 'activated'")[0]
+        recent = fetch_all(conn, "SELECT name, email, donation_amount_cents, activated_at FROM premium_requests WHERE status = 'activated' ORDER BY activated_at DESC LIMIT 10")
     finally:
         conn.close()
-    return jsonify({"ok": True, "summary": {"pending": pending, "activated_requests": activated, "premium_users": premium_users, "recent_activations": [{"name": r[0], "email": r[1], "activated_at": r[2]} for r in recent], "revenue_tracking": False}})
+    return jsonify({"ok": True, "summary": {"pending": pending, "activated_requests": activated, "premium_users": premium_users, "pending_donations": format_brl(pending_amount), "activated_donations": format_brl(activated_amount), "recent_activations": [{"name": r[0], "email": r[1], "donation_amount": format_brl(r[2]), "activated_at": r[3]} for r in recent], "revenue_tracking": False}})
 
 
 @app.post("/api/admin/premium-requests/<int:request_id>/activate")
