@@ -155,7 +155,7 @@ def ensure_schema():
                 """CREATE TABLE IF NOT EXISTS premium_requests (
                     id BIGSERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL,
                     email VARCHAR(254) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'pending',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), activated_at TIMESTAMPTZ NULL)""", 
                 """CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     token_hash VARCHAR(128) NOT NULL UNIQUE, expires_at TIMESTAMPTZ NOT NULL,
@@ -242,7 +242,7 @@ def ensure_schema():
                 """CREATE TABLE IF NOT EXISTS premium_requests (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
                     email TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, activated_at TEXT NULL)""", 
                 """CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
                     token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL,
@@ -318,6 +318,13 @@ def ensure_schema():
                 execute(conn, "ALTER TABLE users ADD COLUMN access_tier TEXT NOT NULL DEFAULT 'free'")
         except Exception:
             # A coluna já existe em instalações novas ou já migradas.
+            pass
+        try:
+            if is_postgres():
+                execute(conn, "ALTER TABLE premium_requests ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ NULL")
+            else:
+                execute(conn, "ALTER TABLE premium_requests ADD COLUMN activated_at TEXT NULL")
+        except Exception:
             pass
 
         subject_rows = [
@@ -1679,10 +1686,24 @@ def set_user_tier(user_id):
 def premium_requests():
     conn = connection()
     try:
-        rows = fetch_all(conn, "SELECT id, name, email, status, created_at FROM premium_requests ORDER BY id DESC")
+        rows = fetch_all(conn, "SELECT id, name, email, status, created_at, activated_at FROM premium_requests ORDER BY id DESC")
     finally:
         conn.close()
-    return jsonify({"ok": True, "requests": [{"id": r[0], "name": r[1], "email": r[2], "status": r[3], "created_at": r[4]} for r in rows]})
+    return jsonify({"ok": True, "requests": [{"id": r[0], "name": r[1], "email": r[2], "status": r[3], "created_at": r[4], "activated_at": r[5]} for r in rows]})
+
+
+@app.get("/api/admin/premium-summary")
+@admin_required
+def premium_summary():
+    conn = connection()
+    try:
+        pending = fetch_one(conn, "SELECT COUNT(*) FROM premium_requests WHERE status = 'pending'")[0]
+        activated = fetch_one(conn, "SELECT COUNT(*) FROM premium_requests WHERE status = 'activated'")[0]
+        premium_users = fetch_one(conn, "SELECT COUNT(*) FROM users WHERE access_tier = 'premium'")[0]
+        recent = fetch_all(conn, "SELECT name, email, activated_at FROM premium_requests WHERE status = 'activated' ORDER BY activated_at DESC LIMIT 10")
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "summary": {"pending": pending, "activated_requests": activated, "premium_users": premium_users, "recent_activations": [{"name": r[0], "email": r[1], "activated_at": r[2]} for r in recent], "revenue_tracking": False}})
 
 
 @app.post("/api/admin/premium-requests/<int:request_id>/activate")
@@ -1697,7 +1718,7 @@ def activate_premium_request(request_id):
         if not user:
             return jsonify({"message": "O aluno ainda não possui cadastro com este e-mail."}), 409
         execute(conn, "UPDATE users SET access_tier = 'premium' WHERE id = %s", (user[0],))
-        execute(conn, "UPDATE premium_requests SET status = 'activated' WHERE id = %s", (request_id,))
+        execute(conn, "UPDATE premium_requests SET status = 'activated', activated_at = CURRENT_TIMESTAMP WHERE id = %s", (request_id,))
         conn.commit()
     finally:
         conn.close()
