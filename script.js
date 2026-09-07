@@ -1,6 +1,11 @@
 const menuToggle = document.querySelector('.menu-toggle');
 const nav = document.querySelector('.nav');
 
+fetch('/api/public-config').then(response => response.json()).then(data => {
+  const key = document.querySelector('#public-pix-key');
+  if (key && data.pix_key) key.textContent = data.pix_key;
+}).catch(() => {});
+
 menuToggle?.addEventListener('click', () => {
   const opened = nav.classList.toggle('open');
   menuToggle.setAttribute('aria-expanded', opened);

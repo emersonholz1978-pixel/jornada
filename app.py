@@ -802,7 +802,7 @@ def access_status(user_id):
         used = fetch_one(conn, "SELECT COUNT(*) FROM general_mock_attempts WHERE user_id = %s", (user_id,))[0]
     finally:
         conn.close()
-    return {"tier": "premium" if premium else "free", "premium": premium, "general_mock_used": used, "general_mock_limit": None if premium else 1, "general_mock_remaining": None if premium else max(0, 1 - used), "phase2_enabled": premium, "pix_key": PIX_KEY if premium else None}
+    return {"tier": "premium" if premium else "free", "premium": premium, "general_mock_used": used, "general_mock_limit": None if premium else 1, "general_mock_remaining": None if premium else max(0, 1 - used), "phase2_enabled": premium, "pix_key": PIX_KEY}
 
 
 def premium_required(user_id):
@@ -841,6 +841,11 @@ def student_area():
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.get("/api/public-config")
+def public_config():
+    return jsonify({"pix_key": PIX_KEY})
 
 
 @app.get("/<path:filename>", endpoint="static_file")
