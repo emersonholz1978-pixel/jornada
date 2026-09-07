@@ -151,7 +151,8 @@ def ensure_schema():
                     email VARCHAR(254) NOT NULL UNIQUE, password_hash TEXT NOT NULL,
                     consent_at TIMESTAMPTZ NOT NULL, plan_days INTEGER NOT NULL DEFAULT 30,
                     access_tier VARCHAR(20) NOT NULL DEFAULT 'free',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+                    premium_expires_at TIMESTAMPTZ NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""", 
                 """CREATE TABLE IF NOT EXISTS premium_requests (
                     id BIGSERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL,
                     email VARCHAR(254) NOT NULL, donation_amount_cents INTEGER NOT NULL DEFAULT 100,
@@ -239,7 +240,8 @@ def ensure_schema():
                     email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
                     consent_at TEXT NOT NULL, plan_days INTEGER NOT NULL DEFAULT 30,
                     access_tier TEXT NOT NULL DEFAULT 'free',
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                    premium_expires_at TEXT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""", 
                 """CREATE TABLE IF NOT EXISTS premium_requests (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
                     email TEXT NOT NULL, donation_amount_cents INTEGER NOT NULL DEFAULT 100,
@@ -320,6 +322,15 @@ def ensure_schema():
                 execute(conn, "ALTER TABLE users ADD COLUMN access_tier TEXT NOT NULL DEFAULT 'free'")
         except Exception:
             # A coluna já existe em instalações novas ou já migradas.
+            pass
+        try:
+            if is_postgres():
+                execute(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMPTZ NULL")
+                execute(conn, "UPDATE users SET premium_expires_at = NOW() + INTERVAL '30 days' WHERE access_tier = 'premium' AND premium_expires_at IS NULL")
+            else:
+                execute(conn, "ALTER TABLE users ADD COLUMN premium_expires_at TEXT NULL")
+                execute(conn, "UPDATE users SET premium_expires_at = datetime('now', '+30 days') WHERE access_tier = 'premium' AND premium_expires_at IS NULL")
+        except Exception:
             pass
         try:
             if is_postgres():
@@ -785,24 +796,42 @@ def logged_user_id():
 def user_row(user_id):
     conn = connection()
     try:
-        return fetch_one(conn, "SELECT id, name, email, plan_days, access_tier FROM users WHERE id = %s", (user_id,))
+        return fetch_one(conn, "SELECT id, name, email, plan_days, access_tier, premium_expires_at FROM users WHERE id = %s", (user_id,))
     finally:
         conn.close()
 
 
+def parse_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value
+
+
 def is_premium_user(user):
-    return bool(user and (str(user[4] or "").lower() == "premium" or str(user[2]).lower() in PREMIUM_EMAILS))
+    if not user:
+        return False
+    if str(user[2]).lower() in PREMIUM_EMAILS:
+        return True
+    expires_at = parse_datetime(user[5])
+    return str(user[4] or "").lower() == "premium" and bool(expires_at and expires_at > datetime.now(timezone.utc))
 
 
 def access_status(user_id):
     user = user_row(user_id)
     premium = is_premium_user(user)
+    premium_expires_at = parse_datetime(user[5]) if user else None
     conn = connection()
     try:
         used = fetch_one(conn, "SELECT COUNT(*) FROM general_mock_attempts WHERE user_id = %s", (user_id,))[0]
     finally:
         conn.close()
-    return {"tier": "premium" if premium else "free", "premium": premium, "general_mock_used": used, "general_mock_limit": None if premium else 1, "general_mock_remaining": None if premium else max(0, 1 - used), "phase2_enabled": premium, "pix_key": PIX_KEY}
+    now = datetime.now(timezone.utc)
+    days_remaining = max(0, (premium_expires_at - now).days) if premium_expires_at else 0
+    return {"tier": "premium" if premium else "free", "premium": premium, "premium_expired": bool(user and str(user[4] or "").lower() == "premium" and not premium), "premium_expires_at": premium_expires_at.isoformat() if premium_expires_at else None, "premium_days_remaining": days_remaining, "general_mock_used": used, "general_mock_limit": None if premium else 1, "general_mock_remaining": None if premium else max(0, 1 - used), "phase2_enabled": premium, "pix_key": PIX_KEY}
 
 
 def premium_required(user_id):
@@ -1052,7 +1081,7 @@ def premium_request():
         conn.commit()
     finally:
         conn.close()
-    return jsonify({"ok": True, "message": "Solicitação registrada. Após a confirmação da doação, a ativação será concluída."}), 201
+    return jsonify({"ok": True, "message": "Solicitação registrada. Após a confirmação da doação, o Premium será ativado por 30 dias."}), 201
 
 
 @app.post("/api/plan")
@@ -1741,15 +1770,19 @@ def activate_premium_request(request_id):
         request_row = fetch_one(conn, "SELECT name, email, status FROM premium_requests WHERE id = %s", (request_id,))
         if not request_row:
             return jsonify({"message": "Solicitação não encontrada."}), 404
-        user = fetch_one(conn, "SELECT id FROM users WHERE email = %s", (request_row[1].lower(),))
+        user = fetch_one(conn, "SELECT id, premium_expires_at FROM users WHERE email = %s", (request_row[1].lower(),))
         if not user:
             return jsonify({"message": "O aluno ainda não possui cadastro com este e-mail."}), 409
-        execute(conn, "UPDATE users SET access_tier = 'premium' WHERE id = %s", (user[0],))
+        now = datetime.now(timezone.utc)
+        current_expiry = parse_datetime(user[1])
+        base = current_expiry if current_expiry and current_expiry > now else now
+        new_expiry = base + timedelta(days=30)
+        execute(conn, "UPDATE users SET access_tier = 'premium', premium_expires_at = %s WHERE id = %s", (new_expiry, user[0]))
         execute(conn, "UPDATE premium_requests SET status = 'activated', activated_at = CURRENT_TIMESTAMP WHERE id = %s", (request_id,))
         conn.commit()
     finally:
         conn.close()
-    return jsonify({"ok": True, "message": "Acesso Premium ativado para o aluno."})
+    return jsonify({"ok": True, "message": "Acesso Premium ativado por 30 dias para o aluno."})
 
 
 @app.get("/api/admin/resumo")
