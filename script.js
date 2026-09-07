@@ -2,9 +2,23 @@ const menuToggle = document.querySelector('.menu-toggle');
 const nav = document.querySelector('.nav');
 
 fetch('/api/public-config').then(response => response.json()).then(data => {
-  const key = document.querySelector('#public-pix-key');
-  if (key && data.pix_key) key.textContent = data.pix_key;
+  document.querySelectorAll('#public-pix-key, #sponsor-pix-key').forEach(key => {
+    if (data.pix_key) key.textContent = data.pix_key;
+  });
 }).catch(() => {});
+
+const copySponsorPix = document.querySelector('#copy-sponsor-pix');
+copySponsorPix?.addEventListener('click', async () => {
+  const key = document.querySelector('#sponsor-pix-key')?.textContent?.trim();
+  const status = document.querySelector('#copy-sponsor-status');
+  if (!key || key === 'Carregando…') return;
+  try {
+    await navigator.clipboard.writeText(key);
+    status.textContent = 'Chave Pix copiada.';
+  } catch (_) {
+    status.textContent = 'Selecione e copie a chave Pix acima.';
+  }
+});
 
 menuToggle?.addEventListener('click', () => {
   const opened = nav.classList.toggle('open');
