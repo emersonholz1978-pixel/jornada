@@ -1395,18 +1395,18 @@ def exam_plan():
     conn = connection()
     try:
         subject_rows = fetch_all(conn, "SELECT s.id, s.name, s.sort_order, COUNT(q.id) FROM subjects s LEFT JOIN questions q ON q.subject_id = s.id WHERE s.phase = %s GROUP BY s.id, s.name, s.sort_order ORDER BY s.sort_order", (phase,))
-        lesson_rows = fetch_all(conn, "SELECT l.id, l.subject_id, l.title FROM lessons l JOIN subjects s ON s.id = l.subject_id WHERE s.phase = %s ORDER BY s.sort_order, l.sort_order", (phase,))
+        lesson_rows = fetch_all(conn, "SELECT l.id, l.subject_id, l.title, l.summary FROM lessons l JOIN subjects s ON s.id = l.subject_id WHERE s.phase = %s ORDER BY s.sort_order, l.sort_order", (phase,))
         lesson_done = {row[0] for row in fetch_all(conn, "SELECT lp.lesson_id FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id JOIN subjects s ON s.id = l.subject_id WHERE lp.user_id = %s AND s.phase = %s", (user_id, phase))}
         units = []
         grouped_lessons = defaultdict(list)
-        for lesson_id, subject_id, title in lesson_rows:
-            grouped_lessons[subject_id].append((lesson_id, title))
+        for lesson_id, subject_id, title, summary in lesson_rows:
+            grouped_lessons[subject_id].append((lesson_id, title, summary))
         subject_names = {row[0]: row[1] for row in subject_rows}
         if phase == "1ª fase":
             quiz_done = {row[0] for row in fetch_all(conn, "SELECT DISTINCT subject_id FROM quiz_attempts WHERE user_id = %s", (user_id,))}
             for subject_id, _, _, question_count in subject_rows:
-                for lesson_id, title in grouped_lessons.get(subject_id, []):
-                    units.append({"kind": "lesson", "id": lesson_id, "subject_id": subject_id, "subject": subject_names[subject_id], "title": title, "completed": lesson_id in lesson_done})
+                for lesson_id, title, summary in grouped_lessons.get(subject_id, []):
+                    units.append({"kind": "lesson", "id": lesson_id, "subject_id": subject_id, "subject": subject_names[subject_id], "title": title, "summary": summary, "reading_material": build_reading_material(subject_names[subject_id], title, summary), "completed": lesson_id in lesson_done})
                 if question_count:
                     units.append({"kind": "quiz", "id": subject_id, "subject_id": subject_id, "subject": subject_names[subject_id], "title": "Bloco de questões da matéria", "completed": subject_id in quiz_done})
         else:
@@ -1417,8 +1417,8 @@ def exam_plan():
             for item_id, subject_id, title in piece_rows: pieces[subject_id].append((item_id, title))
             for item_id, subject_id, prompt in discursive_rows: discursives[subject_id].append((item_id, prompt))
             for subject_id, _, _, _ in subject_rows:
-                for lesson_id, title in grouped_lessons.get(subject_id, []):
-                    units.append({"kind": "lesson", "id": lesson_id, "subject_id": subject_id, "subject": subject_names[subject_id].replace("2ª fase — ", ""), "title": title, "completed": lesson_id in lesson_done})
+                for lesson_id, title, summary in grouped_lessons.get(subject_id, []):
+                    units.append({"kind": "lesson", "id": lesson_id, "subject_id": subject_id, "subject": subject_names[subject_id].replace("2ª fase — ", ""), "title": title, "summary": summary, "reading_material": build_reading_material(subject_names[subject_id], title, summary), "completed": lesson_id in lesson_done})
                 for item_id, title in pieces.get(subject_id, []):
                     units.append({"kind": "piece", "id": item_id, "subject_id": subject_id, "subject": subject_names[subject_id].replace("2ª fase — ", ""), "title": title, "completed": ("piece", item_id) in item_done})
                 for item_id, prompt in discursives.get(subject_id, []):
