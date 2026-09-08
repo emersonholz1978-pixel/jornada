@@ -227,6 +227,12 @@ def ensure_schema():
                     id BIGSERIAL PRIMARY KEY, subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
                     prompt TEXT NOT NULL, model_answer TEXT NOT NULL, source_note TEXT NOT NULL,
                     UNIQUE(subject_id, prompt))""",
+                """CREATE TABLE IF NOT EXISTS phase2_item_progress (
+                    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+                    item_type VARCHAR(20) NOT NULL, item_id BIGINT NOT NULL,
+                    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    PRIMARY KEY(user_id, item_type, item_id))""",
                 """CREATE TABLE IF NOT EXISTS discursive_attempts (
                     id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
@@ -315,6 +321,11 @@ def ensure_schema():
                     id INTEGER PRIMARY KEY AUTOINCREMENT, subject_id INTEGER NOT NULL,
                     prompt TEXT NOT NULL, model_answer TEXT NOT NULL, source_note TEXT NOT NULL,
                     UNIQUE(subject_id, prompt))""",
+                """CREATE TABLE IF NOT EXISTS phase2_item_progress (
+                    user_id INTEGER NOT NULL, subject_id INTEGER NOT NULL,
+                    item_type TEXT NOT NULL, item_id INTEGER NOT NULL,
+                    completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY(user_id, item_type, item_id))""",
                 """CREATE TABLE IF NOT EXISTS discursive_attempts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
                     subject_id INTEGER NOT NULL, question_id INTEGER NOT NULL,
@@ -1327,6 +1338,60 @@ def phase2_materials():
     finally:
         conn.close()
     return jsonify({"ok": True, "pieces": [{"id": r[0], "title": r[1], "scenario": r[2], "structure": r[3], "checklist": r[4], "source_note": r[5]} for r in pieces], "discursives": [{"id": r[0], "prompt": r[1], "model_answer": r[2], "source_note": r[3]} for r in discursives]})
+
+
+@app.get("/api/phase2/progress")
+def phase2_progress():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    denied = premium_required(user_id)
+    if denied:
+        return denied
+    subject_id = request.args.get("subject", type=int)
+    conn = connection()
+    try:
+        if subject_id:
+            rows = fetch_all(conn, "SELECT item_type, item_id FROM phase2_item_progress WHERE user_id = %s AND subject_id = %s", (user_id, subject_id))
+        else:
+            rows = fetch_all(conn, "SELECT item_type, item_id FROM phase2_item_progress WHERE user_id = %s", (user_id,))
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "completed": [{"item_type": r[0], "item_id": r[1]} for r in rows]})
+
+
+@app.post("/api/phase2/progress/<item_type>/<int:item_id>")
+def complete_phase2_item(item_type, item_id):
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    denied = premium_required(user_id)
+    if denied:
+        return denied
+    if item_type not in {"piece", "discursive"}:
+        return jsonify({"message": "Etapa inválida."}), 400
+    subject_id = (request.get_json(silent=True) or {}).get("subject_id")
+    try:
+        subject_id = int(subject_id)
+    except (TypeError, ValueError):
+        return jsonify({"message": "Informe a área da 2ª fase."}), 400
+    conn = connection()
+    try:
+        table = "practical_pieces" if item_type == "piece" else "discursive_questions"
+        if not fetch_one(conn, f"SELECT id FROM {table} WHERE id = %s AND subject_id = %s", (item_id, subject_id)):
+            return jsonify({"message": "Etapa não encontrada."}), 404
+        completed = bool((request.get_json(silent=True) or {}).get("completed"))
+        if completed:
+            if is_postgres():
+                execute(conn, "INSERT INTO phase2_item_progress (user_id, subject_id, item_type, item_id) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING", (user_id, subject_id, item_type, item_id))
+            else:
+                execute(conn, "INSERT OR IGNORE INTO phase2_item_progress (user_id, subject_id, item_type, item_id) VALUES (%s, %s, %s, %s)", (user_id, subject_id, item_type, item_id))
+        else:
+            execute(conn, "DELETE FROM phase2_item_progress WHERE user_id = %s AND item_type = %s AND item_id = %s", (user_id, item_type, item_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "completed": completed})
 
 
 @app.post("/api/phase2/discursive/assess")
