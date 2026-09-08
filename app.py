@@ -971,6 +971,20 @@ def ensure_schema():
                     continue
                 execute(conn, "INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (%s, %s, %s, %s, %s, %s)", question_row)
 
+        # Questões extras de método e aplicação: duas por disciplina da 1ª fase.
+        extra_question_rows = []
+        for subject_id, subject_name, phase in subject_catalog:
+            if phase != "1ª fase":
+                continue
+            extra_question_rows.extend([
+                (subject_id, f"Ao resolver uma questão de {subject_name}, o primeiro passo recomendado é:", json.dumps(["Identificar o instituto, o comando e a fonte jurídica aplicável.", "Escolher a alternativa mais longa sem ler o enunciado.", "Ignorar exceções e requisitos legais.", "Usar uma regra de outra disciplina sem conferir o caso."]), 0, f"Em {subject_name}, a leitura deve começar pela identificação do instituto, do comando e da fonte aplicável, depois se confrontam requisitos e exceções.", "Questão autoral OAB FÁCIL; confira a fonte oficial vigente."),
+                (subject_id, f"Na revisão de {subject_name}, uma atitude que melhora a aprendizagem é:", json.dumps(["Explicar o erro, registrar o fundamento e resolver um novo caso semelhante.", "Apagar a questão errada sem analisar a causa.", "Memorizar apenas a letra da alternativa.", "Revisar somente o tema que já domina."]), 0, f"A revisão eficaz de {subject_name} transforma o erro em diagnóstico: fundamento, causa, correção e nova aplicação.", "Questão autoral OAB FÁCIL; material didático, confira a legislação vigente."),
+            ])
+        for question_row in extra_question_rows:
+            exists = fetch_one(conn, "SELECT id FROM questions WHERE subject_id = %s AND prompt = %s", (question_row[0], question_row[1]))
+            if not exists:
+                execute(conn, "INSERT INTO questions (subject_id, prompt, options_json, answer_index, explanation, source_note) VALUES (%s, %s, %s, %s, %s, %s)", question_row)
+
         practical_rows = [
             (phase2_admin, "Mandado de segurança administrativo", "Ato ilegal de autoridade pública com prova pré-constituída.", "Endereçamento; partes; cabimento; fatos; direito; liminar; pedidos; fechamento.", "Autoridade coatora; prazo; prova; fundamento constitucional; pedido liminar.", "Material autoral OAB FÁCIL; confira o edital e a legislação vigente."),
             (phase2_civil, "Apelação cível", "Parte vencida pretende impugnar sentença desfavorável.", "Interposição; razões; preliminares; mérito; pedidos; fechamento.", "Tempestividade; preparo; dialeticidade; fundamentos; pedido de reforma.", "Material autoral OAB FÁCIL; confira o edital e o CPC vigente."),
