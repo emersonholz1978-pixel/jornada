@@ -116,7 +116,37 @@ READING_TOPIC_MATERIALS = [
     ("revisão", "A revisão ativa deve recuperar o conteúdo sem consulta. Refaça o mapa, explique as exceções, resolva questões e registre os erros para retornar ao ponto exato que ainda não foi consolidado."),
 ]
 
+def build_phase2_reading_material(subject_name, title, summary):
+    area = subject_name.replace("2ª fase — ", "")
+    area_guidance = {
+        "Direito Administrativo": "Na área administrativa, leia o enunciado procurando ato ou omissão estatal, autoridade responsável, processo administrativo, prazo e prova documental. Relacione o fato aos princípios administrativos e ao remédio processual adequado.",
+        "Direito Civil": "Na área cível, organize relação jurídica, pretensão, competência, prazo, tutela e prova. O fundamento deve conectar os fatos ao CPC e ao direito material sem criar fatos que não estão no enunciado.",
+        "Direito Constitucional": "Na área constitucional, comece pelo direito ameaçado, pelo ato coator e pelo instrumento constitucional adequado. Confira legitimidade, competência, prazo, prova pré-constituída e pedido compatível.",
+        "Direito do Trabalho": "Na área trabalhista, separe vínculo, contrato, jornada, verbas, prescrição e prova. Os pedidos devem corresponder aos fatos narrados e observar a estrutura e os requisitos do processo do trabalho.",
+        "Direito Empresarial": "Na área empresarial, identifique empresa, sociedade, crédito, crise ou ato societário. Depois confira legitimidade, documentos, classificação jurídica e a solução prevista na legislação específica.",
+        "Direito Penal": "Na área penal, organize fato, tipo penal, autoria, materialidade, procedimento, nulidades e tese defensiva. A peça deve responder ao momento processual indicado, sem antecipar argumentos inadequados.",
+        "Direito Tributário": "Na área tributária, identifique tributo, lançamento, crédito, ato de cobrança, autoridade e prova. Diferencie limitação constitucional, regra do CTN e consequência processual para formular o pedido certo.",
+    }.get(area, "Comece identificando o problema jurídico, a medida adequada, o prazo, a competência, a prova e os pedidos. Em seguida, conecte cada fato a um fundamento e finalize conferindo a legislação vigente.")
+    title_lower = f"{title} {summary}".lower()
+    if any(word in title_lower for word in ("peça", "estrutura", "checklist")):
+        stage = "Estudo da peça: diagnóstico do caso → cabimento → endereçamento e partes → fatos → fundamentos → tutela, se cabível → pedidos → provas e fechamento. Em cada tópico, escreva apenas o que o enunciado autoriza e confira prazo, competência e legitimidade."
+    elif any(word in title_lower for word in ("discursiva", "questão")):
+        stage = "Estudo da discursiva: responda primeiro à conclusão, indique o dispositivo ou instituto aplicável, explique a regra em uma ou duas frases e aplique-a ao fato. Reserve a última leitura para conferir todos os comandos da pergunta."
+    else:
+        stage = "Fundamentação prática: transforme cada fato relevante em uma premissa, selecione a norma aplicável e termine com uma conclusão ou pedido. Treine sem consultar modelos e depois compare a estrutura."
+    return f"Material aprofundado de leitura — {area}\n\n{area_guidance}\n\n{stage}\n\nComo estudar este módulo\n1. Faça a leitura do enunciado e grife fatos, datas, pessoas, ato e objetivo.\n2. Escreva em uma linha qual é o problema jurídico e qual resultado o cliente busca.\n3. Monte um mapa com cabimento, competência, prazo, fundamento, prova e pedido.\n4. Faça a peça ou resposta sem consultar o modelo.\n5. Compare sua estrutura com o checklist e registre o ponto que faltou.\n\n{summary}\n\nEste é um guia didático autoral. Confira sempre o edital, a legislação, a jurisprudência e os padrões oficiais vigentes."
+
+def build_phase2_piece_material(subject_name, title, scenario, structure, checklist):
+    area = subject_name.replace("2ª fase — ", "")
+    return f"Guia aprofundado da peça — {title}\n\nÁrea: {area}\n\nLeitura do caso\n{scenario}\n\nRoteiro de construção\n1. Identifique quem pede, contra quem, qual é o objetivo e qual fato gera a pretensão.\n2. Confira competência, legitimidade, prazo e existência de prova pré-constituída ou necessidade de instrução.\n3. Use a estrutura-base: {structure}\n4. Desenvolva os fundamentos em blocos curtos, ligando fato, norma e consequência.\n5. Feche com pedidos certos, ordem lógica, provas, valor quando exigido e assinatura.\n\nChecklist de conferência\n{checklist.replace(';', '; ')}\n\nTreino recomendado\nEscreva a peça em tempo controlado, sem consultar modelo. Depois marque cada item do checklist e reescreva somente o trecho que ficou incompleto. Confira a legislação e o padrão do edital vigente."
+
+def build_phase2_discursive_material(subject_name, prompt, model_answer):
+    area = subject_name.replace("2ª fase — ", "")
+    return f"Guia de resposta discursiva — {area}\n\nComando da questão\n{prompt}\n\nEstrutura para responder\n1. Comece com uma conclusão objetiva.\n2. Indique o fundamento jurídico aplicável.\n3. Explique a regra sem fugir do que foi perguntado.\n4. Aplique a regra aos fatos apresentados.\n5. Finalize conferindo se todos os itens do comando foram atendidos.\n\nParâmetro de estudo\n{model_answer}\n\nFaça primeiro sem consultar este guia. Use-o depois para identificar fundamento ausente, aplicação incompleta ou conclusão sem justificativa."
+
 def build_reading_material(subject_name, title, summary):
+    if subject_name.startswith("2ª fase — "):
+        return build_phase2_reading_material(subject_name, title, summary)
     text = f"{title}. {summary}"
     lowered = f"{title} {summary}".lower()
     selected = next((material for keyword, material in READING_TOPIC_MATERIALS if keyword in lowered), None)
@@ -1476,9 +1506,11 @@ def phase2_materials():
     try:
         pieces = fetch_all(conn, "SELECT id, title, scenario, structure, checklist, source_note FROM practical_pieces WHERE subject_id = %s ORDER BY id", (subject_id,))
         discursives = fetch_all(conn, "SELECT id, prompt, model_answer, source_note FROM discursive_questions WHERE subject_id = %s ORDER BY id", (subject_id,))
+        subject_name_row = fetch_one(conn, "SELECT name FROM subjects WHERE id = %s", (subject_id,))
     finally:
         conn.close()
-    return jsonify({"ok": True, "pieces": [{"id": r[0], "title": r[1], "scenario": r[2], "structure": r[3], "checklist": r[4], "source_note": r[5]} for r in pieces], "discursives": [{"id": r[0], "prompt": r[1], "model_answer": r[2], "source_note": r[3]} for r in discursives]})
+    subject_name = subject_name_row[0] if subject_name_row else "2ª fase"
+    return jsonify({"ok": True, "pieces": [{"id": r[0], "title": r[1], "scenario": r[2], "structure": r[3], "checklist": r[4], "source_note": r[5], "reading_material": build_phase2_piece_material(subject_name, r[1], r[2], r[3], r[4])} for r in pieces], "discursives": [{"id": r[0], "prompt": r[1], "model_answer": r[2], "source_note": r[3], "reading_material": build_phase2_discursive_material(subject_name, r[1], r[2])} for r in discursives]})
 
 
 @app.get("/api/phase2/progress")
