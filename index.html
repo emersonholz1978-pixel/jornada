@@ -111,9 +111,9 @@
       <div class="container signup-box">
         <div><p class="eyebrow">Dê o primeiro passo</p><h2>Comece sua preparação hoje.</h2><p>Cadastre-se para conhecer o programa e receber as próximas orientações.</p></div>
         <form id="signup-form" class="signup-form">
-          <label for="name">Seu nome</label><input id="name" name="name" type="text" placeholder="Como podemos chamar você?" required>
-          <label for="email">Seu melhor e-mail</label><input id="email" name="email" type="email" placeholder="voce@email.com" required>
-          <label for="password">Crie uma senha</label><input id="password" name="password" type="password" minlength="8" placeholder="Mínimo de 8 caracteres" required>
+          <label for="name">Seu nome</label><input id="name" name="name" type="text" autocomplete="name" placeholder="Como podemos chamar você?" required>
+          <label for="email">Seu melhor e-mail</label><input id="email" name="email" type="email" autocomplete="email" placeholder="voce@email.com" required>
+          <label for="password">Crie uma senha</label><div class="signup-password-wrap"><input id="password" name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Mínimo de 8 caracteres" required><button id="signup-password-toggle" class="signup-password-toggle" type="button">Mostrar</button></div>
           <label class="consent"><input type="checkbox" required> <span>Concordo com o tratamento dos meus dados conforme a <a href="#privacidade">Política de Privacidade</a>.</span></label>
           <button class="btn btn-gold" type="submit">Quero começar <span>→</span></button>
           <p class="form-message" role="status"></p>

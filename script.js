@@ -38,6 +38,14 @@ document.querySelectorAll('a[href^="#"]').forEach((link) => {
   });
 });
 
+const signupPasswordToggle = document.querySelector('#signup-password-toggle');
+signupPasswordToggle?.addEventListener('click', () => {
+  const password = document.querySelector('#password');
+  const visible = password.type === 'text';
+  password.type = visible ? 'password' : 'text';
+  signupPasswordToggle.textContent = visible ? 'Mostrar' : 'Ocultar';
+});
+
 document.querySelector('#signup-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.target;
