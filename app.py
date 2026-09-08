@@ -804,6 +804,31 @@ def ensure_schema():
         else:
             conn.executemany("INSERT OR IGNORE INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (?, ?, ?, ?, ?)", expanded_lesson_rows)
 
+        # Expansão complementar: trilhas de aprofundamento, aplicação e revisão para tornar cada disciplina mais completa.
+        comprehensive_lesson_rows = []
+        for subject_id, subject_name, phase in subject_catalog:
+            if phase == "1ª fase":
+                extra = [
+                    ("Fundamentos e conceitos-chave", f"Leia os conceitos estruturantes de {subject_name}, identifique os termos que a prova costuma aproximar e escreva uma definição própria para cada um.", "Material autoral OAB FÁCIL; confira a legislação e a fonte oficial vigentes.", 8),
+                    ("Legislação aplicada ao caso", f"Conecte os temas de {subject_name} aos dispositivos legais correspondentes, destaque requisitos, exceções e consequências e aplique o roteiro a um caso curto.", "Material autoral OAB FÁCIL; confira a redação oficial vigente.", 9),
+                    ("Casos práticos e tomada de decisão", f"Resolva três situações-problema de {subject_name}: identifique a questão jurídica, a regra aplicável, a exceção possível e a conclusão fundamentada.", "Material autoral OAB FÁCIL; estudo orientado por casos.", 10),
+                    ("Revisão espaçada e caderno de erros", f"Revise {subject_name} em 24 horas, 7 dias e 30 dias. Registre cada erro com causa, fundamento, correção e uma nova pergunta de verificação.", "Material autoral OAB FÁCIL; confira o edital e as fontes oficiais vigentes.", 11),
+                ]
+            elif phase == "2ª fase":
+                extra = [
+                    ("Leitura estratégica do enunciado", f"Treine a leitura de enunciados de {subject_name}: destaque fatos relevantes, pedido, prazo, competência, tese e dispositivo aplicável.", "Material autoral OAB FÁCIL; confira o edital e os padrões oficiais vigentes.", 7),
+                    ("Modelo de resposta fundamentada", f"Escreva respostas de {subject_name} com tese, fundamento legal, aplicação aos fatos e conclusão, sem inserir informação que não esteja no enunciado.", "Material autoral OAB FÁCIL; confira a legislação vigente.", 8),
+                    ("Simulado orientado e espelho", f"Faça um treino completo de {subject_name} em cinco horas e compare sua peça e suas respostas com um checklist de pontuação, fundamentos e pedidos.", "Material autoral OAB FÁCIL; confira o edital e os padrões oficiais vigentes.", 9),
+                ]
+            else:
+                extra = []
+            comprehensive_lesson_rows.extend((subject_id, title, summary, source_note, sort_order) for title, summary, source_note, sort_order in extra)
+        if is_postgres():
+            with conn.cursor() as cur:
+                cur.executemany("INSERT INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING", comprehensive_lesson_rows)
+        else:
+            conn.executemany("INSERT OR IGNORE INTO lessons (subject_id, title, summary, source_note, sort_order) VALUES (?, ?, ?, ?, ?)", comprehensive_lesson_rows)
+
         question_rows = [
             (ethics, "Na publicidade profissional da advocacia, a conduta adequada é:", json.dumps(["Prometer resultado para atrair clientes.", "Divulgar informação objetiva e discreta, sem captação indevida.", "Comparar diretamente seus serviços com os de outro advogado.", "Distribuir publicidade em qualquer formato sem limites."]), 1, "A publicidade profissional deve ser informativa, discreta e compatível com a ética, sem promessa de resultado ou captação indevida.", "Questão autoral OAB FÁCIL; confira a regulamentação vigente antes da publicação definitiva."),
             (ethics, "Sobre o sigilo profissional, é correto afirmar que:", json.dumps(["É opcional quando o cliente não assina contrato.", "Só existe durante o processo judicial.", "É dever profissional e pode ter exceções justificadas previstas na regulamentação.", "Pode ser afastado sempre que houver interesse comercial."]), 2, "O sigilo é um dever profissional amplo; suas exceções devem ser justificadas e observadas conforme a legislação e a regulamentação vigente.", "Questão autoral OAB FÁCIL; confira o texto oficial vigente."),
