@@ -1663,7 +1663,9 @@ def submit_phase2_mock():
         conn.commit()
     finally:
         conn.close()
-    return jsonify({"ok": True, "score": score, "max_score": 50, "feedback": "Resultado orientador salvo. Revise a peça, compare os fundamentos e confira a legislação e o edital vigentes.", "review": {"piece_missing": missing_piece, "answers": [{"question_id": item["question_id"], "score": item["score"], "missing": [key for key in answer_keys if not item["criteria"].get(key)]} for item in normalized]}})
+    piece_rubric = [{"criterion": key.title(), "points": 2, "met": bool(piece_criteria.get(key)), "guidance": {"cabimento": "adequação da peça", "fundamento": "fundamentação jurídica", "estrutura": "ordem e forma da peça", "pedidos": "pedidos compatíveis", "clareza": "redação técnica"}[key]} for key in piece_keys]
+    answer_rubric = [{"criterion": key.title(), "points": 2, "met": bool(normalized[0]["criteria"].get(key)), "guidance": {"cabimento": "identificação da tese", "fundamento": "regra aplicável", "aplicacao": "relação com os fatos", "conclusao": "consequência ou pedido", "clareza": "organização da resposta"}[key]} for key in answer_keys]
+    return jsonify({"ok": True, "score": score, "max_score": 50, "feedback": "Resultado orientador salvo. Revise a peça, compare os fundamentos e confira a legislação e o edital vigentes.", "rubric": {"piece": piece_rubric, "answers": [{"question_id": item["question_id"], "score": item["score"], "items": [{"criterion": key.title(), "points": 2, "met": bool(item["criteria"].get(key))} for key in answer_keys]} for item in normalized]}, "review": {"piece_missing": missing_piece, "answers": [{"question_id": item["question_id"], "score": item["score"], "missing": [key for key in answer_keys if not item["criteria"].get(key)]} for item in normalized]}})
 
 
 @app.get("/api/phase2/reviews")
@@ -1787,13 +1789,20 @@ def assess_discursive():
         return jsonify({"message": "Escreva uma resposta com pelo menos 20 caracteres e marque os critérios."}), 400
     score = sum(2 for key in ("cabimento", "fundamento", "aplicacao", "conclusao", "clareza") if criteria.get(key))
     feedback = "Boa estrutura inicial. Revise a fonte oficial e compare sua resposta com a orientação." if score >= 6 else "Volte ao enunciado, identifique o instituto, fundamente e conclua com pedido ou consequência jurídica."
+    rubric = [
+        {"criterion": "Cabimento", "points": 2, "met": bool(criteria.get("cabimento")), "guidance": "Identifique a medida, o instituto ou a tese adequada ao enunciado."},
+        {"criterion": "Fundamento", "points": 2, "met": bool(criteria.get("fundamento")), "guidance": "Indique a regra jurídica e explique sua incidência, sem depender apenas de citações."},
+        {"criterion": "Aplicação", "points": 2, "met": bool(criteria.get("aplicacao")), "guidance": "Relacione os fatos do caso aos requisitos jurídicos relevantes."},
+        {"criterion": "Conclusão", "points": 2, "met": bool(criteria.get("conclusao")), "guidance": "Apresente a consequência jurídica, providência ou pedido compatível."},
+        {"criterion": "Clareza", "points": 2, "met": bool(criteria.get("clareza")), "guidance": "Organize a resposta com linguagem objetiva, técnica e coerente."},
+    ]
     conn = connection()
     try:
         execute(conn, "INSERT INTO discursive_attempts (user_id, subject_id, question_id, answer, score, feedback) VALUES (%s, %s, %s, %s, %s, %s)", (user_id, subject_id, question_id, answer, score, feedback))
         conn.commit()
     finally:
         conn.close()
-    return jsonify({"ok": True, "score": score, "max_score": 10, "feedback": feedback})
+    return jsonify({"ok": True, "score": score, "max_score": 10, "feedback": feedback, "rubric": rubric, "next_step": "Revise os critérios marcados como não atendidos e reescreva a resposta antes de consultar o modelo."})
 
 
 @app.get("/api/performance")
