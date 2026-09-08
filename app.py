@@ -67,6 +67,24 @@ def study_guide(name):
     return {"focus": focus, "attention": attention}
 
 
+EXAM_SCHEDULE = [
+    {"edition": "47º Exame de Ordem", "phase": "1ª fase", "date": date(2026, 9, 6)},
+    {"edition": "47º Exame de Ordem", "phase": "2ª fase", "date": date(2026, 10, 18)},
+    {"edition": "48º Exame de Ordem", "phase": "1ª fase", "date": date(2027, 1, 10)},
+    {"edition": "48º Exame de Ordem", "phase": "2ª fase", "date": date(2027, 2, 28)},
+    {"edition": "49º Exame de Ordem", "phase": "1ª fase", "date": date(2027, 5, 9)},
+    {"edition": "49º Exame de Ordem", "phase": "2ª fase", "date": date(2027, 7, 4)},
+    {"edition": "50º Exame de Ordem", "phase": "1ª fase", "date": date(2027, 9, 12)},
+    {"edition": "50º Exame de Ordem", "phase": "2ª fase", "date": date(2027, 10, 31)},
+]
+EXAM_SCHEDULE_SOURCE = "https://www.oab.org.br/noticia/64207/oab-comunica-atualizacao-dos-cronogramas-do-47-e-48-exames-de-ordem"
+
+def next_exam_for_phase(phase):
+    today = date.today()
+    upcoming = [item for item in EXAM_SCHEDULE if item["phase"] == phase and item["date"] >= today]
+    return min(upcoming, key=lambda item: item["date"]) if upcoming else None
+
+
 def is_postgres():
     return bool(DATABASE_URL)
 
@@ -1139,6 +1157,72 @@ def tasks():
         conn.close()
     items = [{"id": r[0], "day_number": r[1], "title": r[2], "description": r[3], "completed": bool(r[4])} for r in rows]
     return jsonify({"ok": True, "days": days, "total": len(items), "completed": sum(1 for item in items if item["completed"]), "tasks": items})
+
+
+@app.get("/api/exam-plan")
+def exam_plan():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    phase = request.args.get("phase", "1ª fase")
+    if phase not in {"1ª fase", "2ª fase"}:
+        return jsonify({"message": "Fase inválida."}), 400
+    if phase == "2ª fase":
+        denied = premium_required(user_id)
+        if denied:
+            return denied
+    exam = next_exam_for_phase(phase)
+    if not exam:
+        return jsonify({"message": "Ainda não há uma data oficial cadastrada para esta fase."}), 404
+    conn = connection()
+    try:
+        subject_rows = fetch_all(conn, "SELECT s.id, s.name, s.sort_order, COUNT(q.id) FROM subjects s LEFT JOIN questions q ON q.subject_id = s.id WHERE s.phase = %s GROUP BY s.id, s.name, s.sort_order ORDER BY s.sort_order", (phase,))
+        lesson_rows = fetch_all(conn, "SELECT l.id, l.subject_id, l.title FROM lessons l JOIN subjects s ON s.id = l.subject_id WHERE s.phase = %s ORDER BY s.sort_order, l.sort_order", (phase,))
+        lesson_done = {row[0] for row in fetch_all(conn, "SELECT lp.lesson_id FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id JOIN subjects s ON s.id = l.subject_id WHERE lp.user_id = %s AND s.phase = %s", (user_id, phase))}
+        units = []
+        grouped_lessons = defaultdict(list)
+        for lesson_id, subject_id, title in lesson_rows:
+            grouped_lessons[subject_id].append((lesson_id, title))
+        subject_names = {row[0]: row[1] for row in subject_rows}
+        if phase == "1ª fase":
+            quiz_done = {row[0] for row in fetch_all(conn, "SELECT DISTINCT subject_id FROM quiz_attempts WHERE user_id = %s", (user_id,))}
+            for subject_id, _, _, question_count in subject_rows:
+                for lesson_id, title in grouped_lessons.get(subject_id, []):
+                    units.append({"kind": "lesson", "id": lesson_id, "subject_id": subject_id, "subject": subject_names[subject_id], "title": title, "completed": lesson_id in lesson_done})
+                if question_count:
+                    units.append({"kind": "quiz", "id": subject_id, "subject_id": subject_id, "subject": subject_names[subject_id], "title": "Bloco de questões da matéria", "completed": subject_id in quiz_done})
+        else:
+            item_done = {(row[0], row[1]) for row in fetch_all(conn, "SELECT item_type, item_id FROM phase2_item_progress WHERE user_id = %s", (user_id,))}
+            piece_rows = fetch_all(conn, "SELECT p.id, p.subject_id, p.title FROM practical_pieces p JOIN subjects s ON s.id = p.subject_id WHERE s.phase = %s ORDER BY s.sort_order, p.id", (phase,))
+            discursive_rows = fetch_all(conn, "SELECT d.id, d.subject_id, d.prompt FROM discursive_questions d JOIN subjects s ON s.id = d.subject_id WHERE s.phase = %s ORDER BY s.sort_order, d.id", (phase,))
+            pieces = defaultdict(list); discursives = defaultdict(list)
+            for item_id, subject_id, title in piece_rows: pieces[subject_id].append((item_id, title))
+            for item_id, subject_id, prompt in discursive_rows: discursives[subject_id].append((item_id, prompt))
+            for subject_id, _, _, _ in subject_rows:
+                for lesson_id, title in grouped_lessons.get(subject_id, []):
+                    units.append({"kind": "lesson", "id": lesson_id, "subject_id": subject_id, "subject": subject_names[subject_id].replace("2ª fase — ", ""), "title": title, "completed": lesson_id in lesson_done})
+                for item_id, title in pieces.get(subject_id, []):
+                    units.append({"kind": "piece", "id": item_id, "subject_id": subject_id, "subject": subject_names[subject_id].replace("2ª fase — ", ""), "title": title, "completed": ("piece", item_id) in item_done})
+                for item_id, prompt in discursives.get(subject_id, []):
+                    units.append({"kind": "discursive", "id": item_id, "subject_id": subject_id, "subject": subject_names[subject_id].replace("2ª fase — ", ""), "title": prompt, "completed": ("discursive", item_id) in item_done})
+    finally:
+        conn.close()
+    today = date.today()
+    days_total = max(1, (exam["date"] - today).days + 1)
+    buckets = [[] for _ in range(days_total)]
+    for index, unit in enumerate(units):
+        bucket = min(days_total - 1, (index * days_total) // max(len(units), 1))
+        buckets[bucket].append(unit)
+    days = []
+    for index, items in enumerate(buckets):
+        day_date = today + timedelta(days=index)
+        completed_items = sum(1 for item in items if item["completed"])
+        days.append({"day_number": index + 1, "date": day_date.isoformat(), "items": items, "completed": not items or completed_items == len(items), "completed_items": completed_items, "total_items": len(items)})
+    completed_days = 0
+    for item in days:
+        if not item["completed"]: break
+        completed_days += 1
+    return jsonify({"ok": True, "phase": phase, "exam": {"edition": exam["edition"], "phase": exam["phase"], "date": exam["date"].isoformat(), "source": EXAM_SCHEDULE_SOURCE}, "days_remaining": days_total, "completed_days": completed_days, "total_days": days_total, "days": days})
 
 
 @app.get("/api/subjects")
