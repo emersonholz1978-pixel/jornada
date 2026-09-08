@@ -67,6 +67,63 @@ def study_guide(name):
     return {"focus": focus, "attention": attention}
 
 
+READING_TOPIC_MATERIALS = [
+    ("inscrição", "A inscrição profissional é a porta de entrada para o exercício regular da advocacia. Estude os requisitos, a documentação e as situações que impedem ou limitam a inscrição. Separe sempre incompatibilidade, que impede totalmente o exercício, de impedimento, que restringe a atuação em situações determinadas."),
+    ("prerrogativas", "Prerrogativas são garantias funcionais necessárias à atuação independente da advocacia, não privilégios pessoais. Na leitura, relacione cada garantia com sua finalidade, os limites legais e a forma de proteção quando houver violação."),
+    ("honorários", "Organize honorários contratuais, arbitrados e de sucumbência. Observe os critérios de fixação, a titularidade profissional, a cobrança e a diferença entre remuneração contratada e verba decorrente da sucumbência."),
+    ("sociedade", "A sociedade de advogados deve ser estudada pela forma de constituição, registro, responsabilidade e atuação dos sócios. Compare sociedade simples, sociedade unipessoal e os limites de participação profissional."),
+    ("publicidade", "A publicidade na advocacia deve ser informativa, discreta e compatível com a dignidade profissional. Leia o tema separando informação permitida, mercantilização, captação indevida, promessa de resultado e exposição de casos."),
+    ("infrações", "No estudo disciplinar, relacione a conduta à consequência possível e ao procedimento aplicável. Monte uma tabela com censura, suspensão, exclusão e multa, sem esquecer as circunstâncias e a regulamentação vigente."),
+    ("sigilo", "O sigilo profissional protege a confiança entre advogado e cliente e alcança informações obtidas no exercício da profissão. Estude seu alcance, a preservação de documentos e as hipóteses excepcionais que precisam de justificativa legal."),
+    ("pessoas", "Comece diferenciando pessoa natural e pessoa jurídica. Depois revise personalidade, capacidade de direito, capacidade de exercício, direitos da personalidade e proteção do nome, imagem, honra e privacidade."),
+    ("obrigações", "A obrigação conecta credor, devedor e prestação. Leia o tema identificando nascimento, adimplemento, inadimplemento, perdas e danos, mora e as formas de extinção, sempre relacionando a regra ao caso concreto."),
+    ("contratos", "Estude formação, validade, interpretação e execução dos contratos. A boa-fé objetiva cria deveres de lealdade, cooperação e informação e deve ser analisada tanto na formação quanto durante e depois do cumprimento."),
+    ("princípios fundamentais", "Os princípios fundamentais orientam a interpretação de toda a Constituição. Faça a leitura conectando fundamentos da República, objetivos fundamentais, soberania popular, cidadania, dignidade e pluralismo político."),
+    ("direitos e garantias", "Diferencie direito protegido e instrumento de proteção. Organize direitos individuais, coletivos e sociais, remédios constitucionais, eficácia e limites, sempre verificando o texto constitucional vigente."),
+    ("organização dos poderes", "A separação de Poderes distribui funções e cria controles recíprocos. Estude competências, independência, fiscalização e responsabilidade de Legislativo, Executivo e Judiciário sem tratar a separação como isolamento absoluto."),
+    ("controle de constitucionalidade", "O controle de constitucionalidade verifica a compatibilidade das normas com a Constituição. Compare controle difuso e concentrado, legitimidade, objeto, efeitos e instrumentos, usando um quadro de revisão."),
+    ("jurisdição", "Jurisdição é a função estatal de solucionar conflitos; competência define qual órgão pode atuar. Leia competência absoluta e relativa, critérios territorial, material e funcional e as consequências da escolha inadequada."),
+    ("atos processuais", "Atos processuais devem ser vistos junto com forma, comunicação, prazos e consequências. Estude a contagem, a preclusão e as regras de intimação, sempre conferindo as disposições atuais do CPC."),
+    ("petição inicial", "A petição inicial apresenta partes, fatos, fundamentos, pedidos e provas. Na leitura, identifique requisitos, emenda, indeferimento, audiência de conciliação e a relação entre causa de pedir e pedido."),
+    ("recursos", "Recurso é o meio de impugnação dentro do processo. Para cada espécie, memorize finalidade, cabimento, prazo, preparo, efeito e órgão competente, sem substituir a leitura do CPC vigente."),
+    ("princípios do direito penal", "Legalidade, anterioridade, culpabilidade e intervenção mínima limitam o poder punitivo. Leia cada princípio como uma pergunta: qual proteção oferece e como altera a análise do caso?"),
+    ("tipicidade", "A análise do crime passa pelo fato típico, pela ilicitude e pela culpabilidade. Separe conduta, resultado, nexo, dolo ou culpa, causas de exclusão e erro, aplicando a sequência aos exemplos."),
+    ("concurso de pessoas", "No concurso de pessoas, identifique pluralidade de agentes, relevância causal e vínculo subjetivo. Diferencie autoria e participação e confira as regras de unidade ou pluralidade de crimes."),
+    ("penas", "Estude espécies de pena e o caminho de sua aplicação. Relacione circunstâncias, fases de dosimetria, regimes e substituições às regras do caso, sempre considerando o texto legal vigente."),
+    ("princípios da administração", "Legalidade, impessoalidade, moralidade, publicidade e eficiência orientam a Administração Pública. Use esses princípios para avaliar atos, contratos, serviços e controle, sem esquecer normas específicas."),
+    ("atos administrativos", "Para estudar atos administrativos, separe competência, finalidade, forma, motivo e objeto. Depois revise atributos, validade, anulação, revogação e controle com exemplos práticos."),
+    ("licitações", "A contratação pública deve ser lida pela sequência planejamento, seleção, contratação e fiscalização. Relacione isonomia, publicidade, julgamento objetivo, contratação direta e responsabilidades à legislação vigente."),
+    ("responsabilidade do estado", "A responsabilidade estatal exige identificar atuação administrativa, dano e nexo causal, além das hipóteses de exclusão e do direito de regresso. Diferencie responsabilidade do Estado e do agente."),
+    ("relação de emprego", "A relação de emprego é identificada pela presença conjunta de pessoalidade, não eventualidade, onerosidade e subordinação. Compare-a com outras relações de trabalho e aplique os elementos ao caso concreto."),
+    ("jornada", "Leia jornada, intervalos, descansos e remuneração como um conjunto. Registre limites, formas de controle, horas extraordinárias e exceções, conferindo a CLT e a Constituição vigentes."),
+    ("férias", "Férias são período anual de descanso remunerado com requisitos e consequências próprios. Estude aquisição, concessão, remuneração, fracionamento e efeitos da extinção contratual."),
+    ("sistema tributário", "O sistema tributário distribui competências e limita o poder de tributar. Diferencie impostos, taxas, contribuições e empréstimos compulsórios, conectando cada espécie ao ente competente."),
+    ("obrigação tributária", "Separe obrigação principal e acessória, sujeito ativo e passivo, fato gerador, lançamento, crédito e exigibilidade. O mapa do tema deve mostrar a passagem do fato para a cobrança."),
+    ("limitações ao poder", "Legalidade, anterioridade, isonomia, irretroatividade e imunidades protegem o contribuinte. Para cada limitação, leia a finalidade, a regra e as exceções constitucionais."),
+    ("empresário", "Empresário é quem exerce profissionalmente atividade econômica organizada para a produção ou circulação de bens ou serviços, ressalvadas as hipóteses legais. Compare atividade empresarial e não empresarial."),
+    ("sociedades empresárias", "Estude personalidade, contrato social, administração e responsabilidade dos sócios. A comparação entre tipos societários ajuda a memorizar patrimônio, representação e dissolução."),
+    ("recuperação", "A recuperação busca preservar a atividade viável e organizar a superação da crise, enquanto a falência segue finalidade própria. Leia pressupostos, sujeitos, efeitos e etapas sem confundir os regimes."),
+    ("relação de consumo", "Identifique consumidor, fornecedor, produto e serviço antes de analisar qualquer problema. Depois conecte vulnerabilidade, informação, proteção contratual e responsabilidade ao caso apresentado."),
+    ("proteção integral", "A proteção integral reconhece crianças e adolescentes como sujeitos de direitos e exige prioridade. Estude direitos fundamentais, família, sociedade, Estado e medidas adequadas à condição peculiar de desenvolvimento."),
+    ("princípios ambientais", "Prevenção, precaução, desenvolvimento sustentável e função socioambiental orientam a tutela ambiental. Leia esses princípios junto com instrumentos de política ambiental e responsabilidade."),
+    ("fontes do direito internacional", "Tratados, costumes, princípios e outras fontes formam o repertório internacional. Diferencie criação, incorporação, interpretação e aplicação da norma no plano interno."),
+    ("direitos políticos", "Direitos políticos envolvem participação no poder, alistamento, voto e elegibilidade. Organize condições, restrições e hipóteses de perda ou suspensão conforme a Constituição e a legislação."),
+    ("orçamento público", "O orçamento organiza planejamento, receitas e despesas públicas. Relacione PPA, LDO e LOA, princípios orçamentários, controle e responsabilidade na gestão fiscal."),
+    ("seguridade social", "Seguridade social reúne saúde, previdência e assistência. Compare finalidade, cobertura, financiamento e requisitos de cada componente antes de estudar os benefícios."),
+    ("peças", "Na 2ª fase, a peça começa pela leitura do problema: identifique cliente, objetivo, medida cabível, competência e prazo. Depois monte endereçamento, fatos, fundamentos, tutela, pedidos e fechamento."),
+    ("fundamentação", "Fundamentar é ligar fato, norma e conclusão. Selecione o dispositivo aplicável, explique sua incidência no enunciado e formule um pedido coerente, evitando copiar argumentos que não respondem ao caso."),
+    ("discursiva", "A resposta discursiva deve ser direta: apresente a conclusão, indique o fundamento jurídico e aplique-o aos fatos. Ao final, confira se todos os itens perguntados foram respondidos no limite de tempo."),
+    ("revisão", "A revisão ativa deve recuperar o conteúdo sem consulta. Refaça o mapa, explique as exceções, resolva questões e registre os erros para retornar ao ponto exato que ainda não foi consolidado."),
+]
+
+def build_reading_material(subject_name, title, summary):
+    text = f"{title}. {summary}"
+    lowered = f"{title} {summary}".lower()
+    selected = next((material for keyword, material in READING_TOPIC_MATERIALS if keyword in lowered), None)
+    if not selected:
+        selected = f"Leia o tema {title} começando pelo conceito central, depois identifique requisitos, classificações, exceções e consequências. Relacione a regra ao caso concreto e confira a fonte oficial indicada antes de finalizar a revisão."
+    return f"Material autoral de leitura — {subject_name}\n\n{selected}\n\nRoteiro de leitura\n1. Leia o desenvolvimento uma vez sem marcar.\n2. Volte ao texto e destaque conceito, requisitos, exceções e consequência.\n3. Explique o tema com suas próprias palavras.\n4. Faça os exercícios do módulo e anote o erro para a revisão.\n\nAtenção: este material é um guia didático e não substitui a legislação, o edital, a jurisprudência ou a fonte oficial vigente."
+
 EXAM_SCHEDULE = [
     {"edition": "47º Exame de Ordem", "phase": "1ª fase", "date": date(2026, 9, 6)},
     {"edition": "47º Exame de Ordem", "phase": "2ª fase", "date": date(2026, 10, 18)},
@@ -1245,9 +1302,9 @@ def lessons():
     subject_id = request.args.get("subject", type=int)
     conn = connection()
     try:
-        base = """SELECT l.id, l.title, l.summary, l.source_note,
+        base = """SELECT l.id, l.title, l.summary, l.source_note, s.name,
                     CASE WHEN p.lesson_id IS NULL THEN 0 ELSE 1 END
-                    FROM lessons l
+                    FROM lessons l JOIN subjects s ON s.id = l.subject_id
                     LEFT JOIN lesson_progress p ON p.lesson_id = l.id AND p.user_id = %s"""
         if subject_id:
             rows = fetch_all(conn, base + " WHERE l.subject_id = %s ORDER BY l.sort_order", (user_id, subject_id))
@@ -1255,7 +1312,7 @@ def lessons():
             rows = fetch_all(conn, base + " ORDER BY l.subject_id, l.sort_order", (user_id,))
     finally:
         conn.close()
-    return jsonify({"ok": True, "lessons": [{"id": r[0], "title": r[1], "summary": r[2], "source_note": r[3], "completed": bool(r[4])} for r in rows]})
+    return jsonify({"ok": True, "lessons": [{"id": r[0], "title": r[1], "summary": r[2], "source_note": r[3], "reading_material": build_reading_material(r[4], r[1], r[2]), "completed": bool(r[5])} for r in rows]})
 
 
 @app.post("/api/lessons/<int:lesson_id>/complete")
