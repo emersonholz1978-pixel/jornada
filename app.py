@@ -191,6 +191,11 @@ def ensure_schema():
                     title VARCHAR(180) NOT NULL, summary TEXT NOT NULL,
                     source_note TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(subject_id, title))""",
+                """CREATE TABLE IF NOT EXISTS lesson_progress (
+                    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    lesson_id BIGINT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+                    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    PRIMARY KEY(user_id, lesson_id))""",
                 """CREATE TABLE IF NOT EXISTS questions (
                     id BIGSERIAL PRIMARY KEY, subject_id BIGINT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
                     prompt TEXT NOT NULL, options_json TEXT NOT NULL, answer_index INTEGER NOT NULL,
@@ -277,6 +282,10 @@ def ensure_schema():
                     title TEXT NOT NULL, summary TEXT NOT NULL,
                     source_note TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(subject_id, title))""",
+                """CREATE TABLE IF NOT EXISTS lesson_progress (
+                    user_id INTEGER NOT NULL, lesson_id INTEGER NOT NULL,
+                    completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY(user_id, lesson_id))""",
                 """CREATE TABLE IF NOT EXISTS questions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, subject_id INTEGER NOT NULL,
                     prompt TEXT NOT NULL, options_json TEXT NOT NULL, answer_index INTEGER NOT NULL,
@@ -1135,18 +1144,65 @@ def subjects():
 
 @app.get("/api/lessons")
 def lessons():
-    if not logged_user_id():
+    user_id = logged_user_id()
+    if not user_id:
         return jsonify({"message": "Faça login para continuar."}), 401
     subject_id = request.args.get("subject", type=int)
     conn = connection()
     try:
+        base = """SELECT l.id, l.title, l.summary, l.source_note,
+                    CASE WHEN p.lesson_id IS NULL THEN 0 ELSE 1 END
+                    FROM lessons l
+                    LEFT JOIN lesson_progress p ON p.lesson_id = l.id AND p.user_id = %s"""
         if subject_id:
-            rows = fetch_all(conn, "SELECT id, title, summary, source_note FROM lessons WHERE subject_id = %s ORDER BY sort_order", (subject_id,))
+            rows = fetch_all(conn, base + " WHERE l.subject_id = %s ORDER BY l.sort_order", (user_id, subject_id))
         else:
-            rows = fetch_all(conn, "SELECT id, title, summary, source_note FROM lessons ORDER BY subject_id, sort_order")
+            rows = fetch_all(conn, base + " ORDER BY l.subject_id, l.sort_order", (user_id,))
     finally:
         conn.close()
-    return jsonify({"ok": True, "lessons": [{"id": r[0], "title": r[1], "summary": r[2], "source_note": r[3]} for r in rows]})
+    return jsonify({"ok": True, "lessons": [{"id": r[0], "title": r[1], "summary": r[2], "source_note": r[3], "completed": bool(r[4])} for r in rows]})
+
+
+@app.post("/api/lessons/<int:lesson_id>/complete")
+def complete_lesson(lesson_id):
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    completed = bool((request.get_json(silent=True) or {}).get("completed"))
+    conn = connection()
+    try:
+        if not fetch_one(conn, "SELECT id FROM lessons WHERE id = %s", (lesson_id,)):
+            return jsonify({"message": "Módulo não encontrado."}), 404
+        if completed:
+            if is_postgres():
+                execute(conn, "INSERT INTO lesson_progress (user_id, lesson_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (user_id, lesson_id))
+            else:
+                execute(conn, "INSERT OR IGNORE INTO lesson_progress (user_id, lesson_id) VALUES (%s, %s)", (user_id, lesson_id))
+        else:
+            execute(conn, "DELETE FROM lesson_progress WHERE user_id = %s AND lesson_id = %s", (user_id, lesson_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "completed": completed})
+
+
+@app.get("/api/subject-progress")
+def subject_progress():
+    user_id = logged_user_id()
+    if not user_id:
+        return jsonify({"message": "Faça login para continuar."}), 401
+    conn = connection()
+    try:
+        rows = fetch_all(conn, """SELECT s.id, s.phase, COUNT(l.id),
+                    COUNT(p.lesson_id)
+                    FROM subjects s
+                    LEFT JOIN lessons l ON l.subject_id = s.id
+                    LEFT JOIN lesson_progress p ON p.lesson_id = l.id AND p.user_id = %s
+                    GROUP BY s.id, s.phase, s.sort_order
+                    ORDER BY s.sort_order""", (user_id,))
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "subjects": [{"id": r[0], "phase": r[1], "total": r[2], "completed": r[3]} for r in rows]})
 
 
 @app.get("/api/phase2/mock")
