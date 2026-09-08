@@ -25,8 +25,17 @@ menuToggle?.addEventListener('click', () => {
   menuToggle.setAttribute('aria-expanded', opened);
 });
 
-document.querySelectorAll('.nav a').forEach((link) => {
-  link.addEventListener('click', () => nav.classList.remove('open'));
+document.querySelectorAll('a[href^="#"]').forEach((link) => {
+  link.addEventListener('click', (event) => {
+    nav?.classList.remove('open');
+    menuToggle?.setAttribute('aria-expanded', 'false');
+    const selector = link.getAttribute('href');
+    const target = selector ? document.querySelector(selector) : null;
+    if (!target) return;
+    event.preventDefault();
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    history.replaceState(null, '', selector);
+  });
 });
 
 document.querySelector('#signup-form')?.addEventListener('submit', async (event) => {
