@@ -1735,6 +1735,26 @@ def set_user_tier(user_id):
     return jsonify({"ok": True, "user_id": user_id, "tier": tier})
 
 
+@app.delete("/api/admin/qa-users/<path:email>")
+@admin_required
+def delete_qa_user(email):
+    email = str(email).strip().lower()
+    if not (email.startswith("qa.oabfacil.") and email.endswith("@example.com")):
+        return jsonify({"message": "A limpeza está limitada a contas QA do OAB FÁCIL."}), 400
+    conn = connection()
+    try:
+        user = fetch_one(conn, "SELECT id, name, email FROM users WHERE email = %s", (email,))
+        if not user:
+            return jsonify({"message": "Conta QA não encontrada."}), 404
+        execute(conn, "DELETE FROM registrations WHERE email = %s", (email,))
+        execute(conn, "DELETE FROM premium_requests WHERE email = %s", (email,))
+        execute(conn, "DELETE FROM users WHERE id = %s", (user[0],))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": f"Conta QA {email} removida com sucesso."})
+
+
 @app.get("/api/admin/premium-requests")
 @admin_required
 def premium_requests():
