@@ -24,4 +24,4 @@ O formulário atual é demonstrativo: para armazenar cadastros com segurança, s
 ## Créditos
 
 © 2026 Emerson Jacob Holz. Todos os direitos reservados.
-Contato administrativo: emersonjh@yahoo.com
+Contato administrativo: oabfacil.administrativo@gmail.com
