@@ -1,0 +1,39 @@
+{
+  "produto": "Vade Mecum Digital OAB FÁCIL",
+  "status": "inventário-base para validação legislativa e integração",
+  "aviso": "Os textos devem ser conferidos na fonte oficial e na redação vigente antes do uso em prova.",
+  "fontes_oficiais": [
+    {"nome": "Portal de legislação do Planalto", "url": "https://www4.planalto.gov.br/legislacao/"},
+    {"nome": "Índice oficial dos códigos", "url": "https://www4.planalto.gov.br/legislacao/portal-legis/legislacao-1/codigos-1"},
+    {"nome": "Constituição Federal compilada", "url": "https://www.planalto.gov.br/ccivil_03/constituicao/constituicaocompilado.htm"},
+    {"nome": "Súmulas vinculantes do STF", "url": "https://portal.stf.jus.br/jurisprudencia/sumariosumulas.asp?base=26"},
+    {"nome": "Súmulas do STJ", "url": "https://scon.stj.jus.br/SCON/sumstj/"},
+    {"nome": "Temas repetitivos do STJ", "url": "https://processo.stj.jus.br/repetitivos/temas_repetitivos/"}
+  ],
+  "fases": {
+    "primeira": [
+      {"disciplina":"Constitucional","normas":["Constituição Federal de 1988","Emendas constitucionais vigentes","LC 95/1998"]},
+      {"disciplina":"Direitos Humanos","normas":["Decreto 678/1992 — Convenção Americana","Decreto 592/1992 — PIDCP","Decreto 591/1992 — PIDESC","Decreto 6.949/2009 — Convenção sobre os Direitos das Pessoas com Deficiência","Lei 13.146/2015 — Estatuto da Pessoa com Deficiência","Lei 12.288/2010 — Estatuto da Igualdade Racial","Lei 7.716/1989 e alterações"]},
+      {"disciplina":"Civil","normas":["Lei 10.406/2002 — Código Civil","Decreto-Lei 4.657/1942 — LINDB","Lei 9.307/1996 — Arbitragem","Lei 13.140/2015 — Mediação","Lei 13.874/2019 — Liberdade Econômica"]},
+      {"disciplina":"Processo Civil","normas":["Lei 13.105/2015 — CPC","Lei 7.347/1985 — Ação Civil Pública","Lei 9.099/1995 — Juizados Especiais","Lei 10.259/2001 — Juizados Federais","Lei 12.153/2009 — Juizados da Fazenda Pública"]},
+      {"disciplina":"Penal e Processo Penal","normas":["Decreto-Lei 2.848/1940 — Código Penal","Decreto-Lei 3.689/1941 — CPP","Lei 7.210/1984 — Execução Penal","Lei 8.072/1990 — Crimes Hediondos","Lei 9.455/1997 — Tortura","Lei 11.340/2006 — Maria da Penha","Lei 11.343/2006 — Drogas","Lei 12.850/2013 — Organizações Criminosas","Lei 13.869/2019 — Abuso de Autoridade"]},
+      {"disciplina":"Trabalho e Processo do Trabalho","normas":["Decreto-Lei 5.452/1943 — CLT","Lei 13.467/2017 — Reforma Trabalhista","Lei 8.036/1990 — FGTS","LC 150/2015 — Trabalho Doméstico","Lei 7.783/1989 — Greve","Lei 5.584/1970","Lei 7.701/1988"]},
+      {"disciplina":"Administrativo","normas":["Lei 8.429/1992 — Improbidade","Lei 14.133/2021 — Licitações","Lei 9.784/1999 — Processo Administrativo Federal","Lei 12.527/2011 — Acesso à Informação","Lei 13.709/2018 — LGPD","Decreto-Lei 3.365/1941 — Desapropriação"]},
+      {"disciplina":"Constitucional Processual","normas":["Lei 9.868/1999 — ADI e ADC","Lei 9.882/1999 — ADPF","Lei 12.016/2009 — Mandado de Segurança","Lei 9.507/1997 — Habeas Data","Lei 13.300/2016 — Mandado de Injunção","Lei 4.717/1965 — Ação Popular"]},
+      {"disciplina":"Tributário","normas":["Lei 5.172/1966 — CTN","Lei 6.830/1980 — Execução Fiscal","LC 87/1996 — ICMS","Lei 8.137/1990 — Crimes contra a Ordem Tributária","EC 132/2023 — Reforma Tributária"]},
+      {"disciplina":"Empresarial","normas":["Lei 10.406/2002 — Direito de Empresa","Lei 6.404/1976 — Sociedades por Ações","Lei 11.101/2005 — Recuperação e Falência","Lei 14.112/2020 — Alterações na recuperação judicial","Lei 9.279/1996 — Propriedade Industrial","Lei 7.357/1985 — Cheque"]},
+      {"disciplina":"Consumidor","normas":["Lei 8.078/1990 — CDC","Lei 14.181/2021 — Superendividamento","Lei 7.347/1985 — Tutela coletiva"]},
+      {"disciplina":"Ambiental","normas":["Lei 6.938/1981 — Política Nacional do Meio Ambiente","Lei 9.605/1998 — Crimes Ambientais","Lei 12.651/2012 — Código Florestal","LC 140/2011 — Competência Ambiental","Decreto 6.514/2008"]},
+      {"disciplina":"ECA","normas":["Lei 8.069/1990 — Estatuto da Criança e do Adolescente","Lei 13.257/2016 — Primeira Infância","Lei 14.811/2024"]},
+      {"disciplina":"Internacional","normas":["Decreto-Lei 4.657/1942 — LINDB","Lei 13.105/2015 — Cooperação Internacional","Lei 13.445/2017 — Migração","Tratados de Direitos Humanos vigentes"]},
+      {"disciplina":"Previdenciário","normas":["Lei 8.212/1991","Lei 8.213/1991","EC 103/2019","Lei 8.742/1993 — LOAS"]},
+      {"disciplina":"Filosofia do Direito","normas":["Constituição Federal — princípios e direitos fundamentais","Edital vigente e conteúdo programático da prova"]},
+      {"disciplina":"Ética e OAB","normas":["Lei 8.906/1994 — Estatuto da Advocacia e da OAB","Lei 13.247/2016","Lei 14.365/2022","Lei 14.612/2023","Código de Ética e Disciplina","Regulamento Geral","Provimentos e resoluções vigentes"]}
+    ],
+    "segunda": {
+      "areas":["Civil","Penal","Trabalho","Constitucional","Tributário","Empresarial"],
+      "blocos":["Legislação essencial por área","Identificação da peça","Endereçamento e competência","Preliminares e mérito","Fundamentação e aplicação ao caso","Pedidos e requerimentos","Recursos","Questões discursivas","Checklist de correção","Simulado de 50 pontos e gestão de cinco horas"]
+    }
+  },
+  "controle_de_atualizacao":["data da conferência","fonte oficial","alterações posteriores","revogações","vigência e transição","controle de constitucionalidade","jurisprudência aplicável","conferência final antes da publicação"]
+}
