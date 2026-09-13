@@ -21,6 +21,18 @@
     @media(max-width:600px){.top-sunday-card{padding:18px 16px}.top-sunday-card .primary{width:100%}.stagebar{grid-template-columns:1fr 1fr}.access-info{align-items:flex-start}.access-info>div{width:100%}}
 .access-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start}.access-info{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;min-width:0}.access-info>div{min-width:0}.access-card strong,.access-card p,.premium-pix,.premium-pix code{overflow-wrap:anywhere;word-break:break-word}.access-actions{display:flex;align-items:flex-start;justify-content:flex-end;min-width:0}.study-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.study-actions button{border:1px solid #d5dce7;background:#fff;color:var(--navy);border-radius:8px;padding:8px 9px;font-size:.78rem;font-weight:800;min-height:38px}.study-actions button:hover{border-color:var(--gold);background:#fffaf0}.study-panel{margin-top:11px;padding:12px;border:1px solid #eadfc9;border-radius:10px;background:#fffaf0;font-size:.85rem;line-height:1.5}.study-panel strong{display:block;color:var(--gold-dark);margin-bottom:5px}.study-panel ul,.study-panel ol{margin:7px 0;padding-left:20px}.study-panel p{margin:7px 0}.study-panel .primary,.study-panel .secondary{font-size:.78rem;padding:7px 10px;min-height:36px}@media(max-width:600px){.access-card{grid-template-columns:1fr}.access-info{grid-template-columns:1fr;gap:9px}.access-actions{width:100%;justify-content:stretch}.access-actions .access-cta{width:100%}.study-actions button{flex:1 1 100%;text-align:left}}
     .plan-item{flex-wrap:wrap}.plan-inline-material{flex:1 1 100%;margin:9px 0 2px;padding:13px 14px;background:#fffaf0;border:1px solid #eadfc9;border-radius:10px;font-size:.84rem;line-height:1.55;max-height:420px;overflow:auto}.plan-inline-material strong{display:block;color:var(--gold-dark);margin-bottom:6px}.plan-inline-material div{white-space:normal}
+
+    /* Repaginação mobile-first inspirada nos exemplos, preservando a paleta OAB FÁCIL */
+    .mobile-nav{display:none}
+    .eyebrow{color:var(--gold-dark);font-weight:900;letter-spacing:.08em;text-transform:uppercase;font-size:.72rem}
+    .hero{background:linear-gradient(135deg,var(--navy),var(--navy-2));border-radius:20px;padding:26px 28px;color:#fff;box-shadow:0 12px 30px #17233b22}
+    .hero .muted{color:#dbe3ef}.hero .eyebrow{color:#f4d48d}.hero h1{margin:.15rem 0 .45rem;font-size:clamp(1.55rem,4vw,2.15rem)}
+    .content-card{scroll-margin-top:80px}
+    @media(max-width:700px){
+      body{padding-bottom:76px}.top{padding:13px 16px;position:sticky;top:0}.brand{font-size:.86rem}.top-actions{gap:6px}.top-actions>a{display:none}.top button{padding:8px 10px;font-size:.76rem;min-height:40px}
+      .wrap{padding:16px 14px}.hero{padding:21px 18px;border-radius:16px}.hero p{line-height:1.45}.phase-tabs{margin:16px 0 14px;top:64px;gap:5px;padding:5px}.phase-tabs button{padding:11px 6px;font-size:.72rem;line-height:1.2}.access-card{border-radius:14px;padding:14px}.phase-banner{padding:19px 17px;border-radius:16px}.phase-banner h2{font-size:1.35rem}.phase-banner p{font-size:.9rem}.grid,.grid-2,.materials-layout,.phase2-layout{display:block}.grid>.card,.grid-2>.card,.phase2-main>.card,.content-card{margin-top:14px}.card{padding:17px;border-radius:14px}.section-heading{gap:10px}.section-heading h2{font-size:1.08rem}.stats{gap:18px}.stats strong{font-size:1.45rem}.lesson-grid,.piece-grid,.discursive-list,.performance-list{grid-template-columns:1fr}.track-card{position:static;margin-bottom:14px}.subject-list,.track-list{max-height:none;display:grid;grid-template-columns:1fr 1fr}.subject-button,.track-button{font-size:.78rem;padding:10px 8px}.stagebar{grid-template-columns:1fr 1fr}.stage{font-size:.75rem;padding:9px}.select-row select{min-width:0;width:100%}.select-row button{width:100%}.sunday-card{padding:16px}.sunday-card .primary{width:100%}.footer-note{font-size:.72rem;padding:0 10px}
+      .mobile-nav{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:0;right:0;bottom:0;z-index:50;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 22px #17233b18;padding:7px 6px calc(7px + env(safe-area-inset-bottom))}.mobile-nav a,.mobile-nav button{border:0;background:transparent;color:var(--muted);text-decoration:none;text-align:center;font:inherit;font-size:.66rem;font-weight:800;padding:5px 2px;min-height:48px}.mobile-nav .nav-icon{display:block;font-size:1.15rem;line-height:1.2;margin-bottom:2px}.mobile-nav a.active,.mobile-nav button.active{color:var(--navy)}.mobile-nav a:nth-child(3){color:var(--gold-dark)}
+    }
   </style>
 </head>
 <body>
@@ -67,6 +79,14 @@
 
     <p class="footer-note">OAB FÁCIL · material autoral de estudo · confira sempre a legislação, o edital e as fontes oficiais vigentes.</p>
   </main>
+
+  <nav class="mobile-nav" aria-label="Navegação rápida">
+    <a href="#phase1-panel" class="active"><span class="nav-icon">⌂</span>Início</a>
+    <a href="#tasks"><span class="nav-icon">✓</span>Agenda</a>
+    <a href="/vade-mecum.html"><span class="nav-icon">§</span>Vade Mecum</a>
+    <button type="button" data-mobile-phase="phase1"><span class="nav-icon">?</span>Questões</button>
+    <button type="button" data-mobile-phase="phase2"><span class="nav-icon">✎</span>2ª fase</button>
+  </nav>
   <script>
     let currentDays=30,currentPhase1Subject=null,currentPhase2Subject=null,phase1Subjects=[],phase2Subjects=[],progressBySubject={},mockStartedAt=0,phase1TimerInterval,phase2TimerInterval,currentAccess={tier:'free',premium:false,general_mock_used:0,general_mock_remaining:1};
     const $=selector=>document.querySelector(selector), $$=selector=>Array.from(document.querySelectorAll(selector));
@@ -77,6 +97,9 @@
     function activatePhase(phase,scrollToPanel=false){if(phase==='phase2'&&!currentAccess.premium){showPremiumMessage();return}$$('[data-phase-tab]').forEach(tab=>{const active=tab.dataset.phaseTab===phase;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',active)});$('#phase1-panel').hidden=phase!=='phase1';$('#phase2-panel').hidden=phase!=='phase2';sessionStorage.setItem('oab-active-phase',phase);if(scrollToPanel){const panel=phase==='phase2'?$('#phase2-panel'):$('#phase1-panel');panel?.scrollIntoView({behavior:'smooth',block:'start'});}}
     $$('[data-phase-tab]').forEach(tab=>tab.addEventListener('click',()=>{const phase=tab.dataset.phaseTab;activatePhase(phase,true);loadExamPlan(phase==='phase2'?'2ª fase':'1ª fase')}));
     activatePhase(sessionStorage.getItem('oab-active-phase')||'phase1');
+
+    $$('[data-mobile-phase]').forEach(button=>button.addEventListener('click',()=>{activatePhase(button.dataset.mobilePhase,true)}));
+
 
     async function loadMe(){const response=await fetch('/api/me');if(!response.ok){window.location.href='/login.html';return null}const data=await response.json();$('#greeting').textContent=`Aluno: ${data.user.name}`;currentDays=data.user.plan_days||30;if(data.user.access)renderAccess(data.user.access);return data}
     function showPremiumMessage(){window.location.href='/premium.html';}
