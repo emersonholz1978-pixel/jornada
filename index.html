@@ -9,6 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+<style>
+.bottom-nav{display:flex;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:30;width:min(620px,calc(100% - 28px));padding:9px 10px;background:rgba(7,27,59,.97);border:1px solid rgba(216,172,85,.35);border-radius:18px;box-shadow:0 14px 35px rgba(7,27,59,.3);justify-content:space-around;gap:4px}.bottom-nav a{display:flex;flex:1;min-width:0;align-items:center;justify-content:center;flex-direction:column;gap:3px;color:#c8d3e2;text-decoration:none;font-size:18px;border-radius:11px;padding:5px 3px}.bottom-nav a:hover,.bottom-nav a:focus{background:#0c2852;color:#f1d38b}.bottom-nav small{font-size:9px;white-space:nowrap;letter-spacing:.01em}.bottom-nav a:last-child{color:#071b3b;background:#d8ac55;font-weight:800}.bottom-nav a:last-child:hover{background:#f1d38b}body{padding-bottom:100px}@media(min-width:801px){.bottom-nav{bottom:22px}.bottom-nav a{flex-direction:row;gap:7px;padding:8px 10px}.bottom-nav small{font-size:11px}}
+</style>
 </head>
 <body>
   <header class="topbar" id="inicio">
@@ -20,8 +23,6 @@
       <button class="menu-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
       <nav class="nav" aria-label="Navegação principal">
         <a href="#metodo">Método</a>
-        <a href="#fases">Fases</a>
-        <a href="#materiais">Materiais</a>
         <a href="#acessos">Acessos</a>
         <a href="#duvidas">Dúvidas</a>
         <a class="btn btn-small btn-outline" href="#cadastro">Área do aluno</a>
@@ -79,22 +80,7 @@
       </div>
     </section>
 
-    <section class="section phases" id="fases">
-      <div class="container">
-        <div class="section-heading"><div><p class="eyebrow">Do primeiro estudo à aprovação</p><h2>Preparação para cada fase</h2></div><p>Comece onde você está e avance com segurança.</p></div>
-        <div class="phase-grid">
-          <article class="phase-card phase-one"><span class="phase-tag">1ª FASE</span><h3>Objetividade para acertar mais</h3><p>Reforce as disciplinas, revise os temas mais cobrados e pratique com questões comentadas.</p><a href="#cadastro">Ver programa →</a></article>
-          <article class="phase-card phase-two"><span class="phase-tag">2ª FASE</span><h3>Prática para escrever melhor</h3><p>Aprenda a identificar a peça, estruturar sua resposta e desenvolver uma estratégia de prova.</p><a href="#cadastro">Ver programa →</a></article>
-        </div>
-      </div>
-    </section>
 
-    <section class="section materials" id="materiais">
-      <div class="container material-grid">
-        <div class="material-visual"><div class="book-card"><span>OAB</span><strong>GUIA DE<br>APROVAÇÃO</strong><small>1ª FASE</small></div><div class="gold-circle"></div></div>
-        <div><p class="eyebrow">Tudo em um só lugar</p><h2>Materiais para estudar do seu jeito</h2><ul class="check-list"><li><span>✓</span> Programa completo da 1ª fase</li><li><span>✓</span> Peças práticas e esquematização para a 2ª fase</li><li><span>✓</span> Calendário de provas e revisões</li><li><span>✓</span> Acompanhamento do seu progresso</li></ul><a class="btn btn-dark" href="#cadastro">Acessar materiais</a></div>
-      </div>
-    </section>
 
     <section class="section phases" id="acessos">
       <div class="container">
@@ -133,7 +119,15 @@
     </section>
   </main>
 
-  <footer id="privacidade"><div class="container footer-grid"><div><a class="brand footer-brand" href="#inicio"><span class="brand-mark">OAB</span><span class="brand-name">FÁCIL</span></a><p>Preparação organizada para a sua aprovação.</p></div><div><strong>OAB FÁCIL</strong><a href="#metodo">Sobre o método</a><a href="#materiais">Materiais</a><a href="#cadastro">Cadastro</a></div><div><strong>Transparência</strong><a href="#privacidade">Política de Privacidade</a><a href="mailto:oabfacil.administrativo@gmail.com">Contato administrativo</a><a href="#doacao">Apoie o projeto</a></div></div><div class="container footer-bottom"><span>© 2026 Emerson Jacob Holz. Todos os direitos reservados.</span><span>Projeto independente mantido com apoio voluntário.</span></div></footer>
+  <footer id="privacidade"><div class="container footer-grid"><div><a class="brand footer-brand" href="#inicio"><span class="brand-mark">OAB</span><span class="brand-name">FÁCIL</span></a><p>Preparação organizada para a sua aprovação.</p></div><div><strong>OAB FÁCIL</strong><a href="#metodo">Sobre o método</a><a href="#cadastro">Cadastro</a></div><div><strong>Transparência</strong><a href="#privacidade">Política de Privacidade</a><a href="mailto:oabfacil.administrativo@gmail.com">Contato administrativo</a><a href="#doacao">Apoie o projeto</a></div></div><div class="container footer-bottom"><span>© 2026 Emerson Jacob Holz. Todos os direitos reservados.</span><span>Projeto independente mantido com apoio voluntário.</span></div></footer>
+
+  <nav class="bottom-nav" aria-label="Atalhos principais">
+    <a href="#inicio"><span>⌂</span><small>Início</small></a>
+    <a href="#metodo"><span>✦</span><small>Método</small></a>
+    <a href="/vade-mecum.html"><span>▤</span><small>Vade Mecum</small></a>
+    <a href="/login.html"><span>⚖</span><small>1ª e 2ª fases</small></a>
+    <a href="#cadastro"><span>→</span><small>Acessar</small></a>
+  </nav>
   <script src="script.js"></script>
 </body>
 </html>
